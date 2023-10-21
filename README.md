@@ -20,3 +20,6 @@ Notebooks_Scripts_final
 
 ### Input data
 Input_final
+
+### Histologic figures
+Histologic_figures_final
