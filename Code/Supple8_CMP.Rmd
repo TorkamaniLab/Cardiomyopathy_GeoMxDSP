@@ -1,0 +1,192 @@
+---
+title: "Supple8_CMP"
+output: html_document
+date: "2024-05-29"
+---
+
+```{r}
+library(dplyr)
+library(ggplot2)
+library(ggrepel)
+
+```
+
+```{r}
+ec.icmp <- read.csv("~/Desktop/KAIST/HF/DEG/SejongIn_Clinical_phenotype_LV_FullROI_N_cellselection_Y_Endothelial_cells_ROI_large_Vent_LV_DsSelect_ICMP__Control_Y_OL_N_RE_PID_Institute_Fixation.interval_KR_Y2023-06-22conditionICMP-conditionControl.csv")
+cmc.icmp <- read.csv("~/Desktop/KAIST/HF/DEG/SejongIn_Clinical_phenotype_LV_FullROI_N_cellselection_Y_Cardiomyocytes_ROI_large_Vent_LV_DsSelect_ICMP__Control_Y_OL_pcaplot_outlier_RE_PID_Institute_Fixation.interval_KR_Y2023-06-23conditionICMP-conditionControl.csv")
+
+cmc.nes <- read.csv("~/Desktop/KAIST/HF/DEG/SejongIn_Clinical_phenotype_LV_FullROI_N_cellselection_Y_Cardiomyocytes_ROI_large_Vent_LV_DsSelect_NES_HCMP__Control_Y_OL_pcaplot_outlier_RE_PID_Institute_Fixation.interval_KR_Y2023-06-22conditionNES_HCMP-conditionControl.csv")
+ec.nes <- read.csv("~/Desktop/KAIST/HF/DEG/SejongIn_Clinical_phenotype_LV_FullROI_N_cellselection_Y_Endothelial_cells_ROI_large_Vent_LV_DsSelect_NES_HCMP__Control_Y_OL_pcaplot_outlier_RE_PID_Institute_Fixation.interval_KR_Y2023-06-22conditionNES_HCMP-conditionControl.csv")
+
+ec.es <- read.csv("~/Desktop/KAIST/HF/DEG/SejongIn_Clinical_phenotype_LV_FullROI_N_cellselection_Y_Endothelial_cells_ROI_large_Vent_LV_DsSelect_ES_HCMP__Control_Y_OL_pcaplot_outlier_RE_PID_Institute_Fixation.interval_KR_Y2023-06-22conditionES_HCMP-conditionControl.csv")
+cmc.es <- read.csv("~/Desktop/KAIST/HF/DEG/SejongIn_Clinical_phenotype_LV_FullROI_N_cellselection_Y_Cardiomyocytes_ROI_large_Vent_LV_DsSelect_ES_HCMP__Control_Y_OL_pcaplot_outlier_RE_PID_Institute_Fixation.interval_KR_Y2023-06-22conditionES_HCMP-conditionControl.csv")
+
+cmc.dcmp.icmp <- read.csv("~/Desktop/KAIST/HF/DEG/SejongIn_Clinical_phenotype_LV_FullROI_N_cellselection_Y_Cardiomyocytes_ROI_large_Vent_LV_DsSelect_DCMP__ICMP_Y_OL_pcaplot_outlier_RE_PID_Fixation.interval_KR_Y2023-06-23conditionICMP-conditionDCMP.csv")
+ec.dcmp.icmp <- read.csv("~/Desktop/KAIST/HF/DEG/SejongIn_Clinical_phenotype_LV_FullROI_N_cellselection_Y_Endothelial_cells_ROI_large_Vent_LV_DsSelect_DCMP__ICMP_Y_OL_pcaplot_outlier_RE_PID_Fixation.interval_KR_Y2023-06-23conditionICMP-conditionDCMP.csv")
+
+cmc.dcmp.nes <- read.csv("~/Desktop/KAIST/HF/DEG/SejongIn_Clinical_phenotype_LV_FullROI_N_cellselection_Y_Cardiomyocytes_ROI_large_Vent_LV_DsSelect_DCMP__NES_HCMP_Y_OL_pcaplot_outlier_RE_PID_Fixation.interval_KR_Y2023-06-23conditionDCMP-conditionNES_HCMP.csv")
+ec.dcmp.nes <- read.csv("~/Desktop/KAIST/HF/DEG/SejongIn_Clinical_phenotype_LV_FullROI_N_cellselection_Y_Endothelial_cells_ROI_large_Vent_LV_DsSelect_DCMP__NES_HCMP_Y_OL_pcaplot_outlier_RE_PID_Fixation.interval_KR_Y2023-06-23conditionDCMP-conditionNES_HCMP.csv")
+
+cmc.dcmp.es <- read.csv("~/Desktop/KAIST/HF/DEG/SejongIn_Clinical_phenotype_LV_FullROI_N_cellselection_Y_Cardiomyocytes_ROI_large_Vent_LV_DsSelect_DCMP__ES_HCMP_Y_OL_pcaplot_outlier_RE_PID_Fixation.interval_KR_Y2023-06-23conditionES_HCMP-conditionDCMP.csv")
+ec.dcmp.es <- read.csv("~/Desktop/KAIST/HF/DEG/SejongIn_Clinical_phenotype_LV_FullROI_N_cellselection_Y_Endothelial_cells_ROI_large_Vent_LV_DsSelect_DCMP__ES_HCMP_Y_OL_pcaplot_outlier_RE_PID_Fixation.interval_KR_Y2023-06-23conditionES_HCMP-conditionDCMP.csv")
+
+cmc.icmp.nes <- read.csv("~/Desktop/KAIST/HF/DEG/SejongIn_Clinical_phenotype_LV_FullROI_N_cellselection_Y_Cardiomyocytes_ROI_large_Vent_LV_DsSelect_ICMP__NES_HCMP_Y_OL_N_RE_PID_Institute_Fixation.interval_KR_Y2023-06-23conditionICMP-conditionNES_HCMP.csv")
+ec.icmp.nes <- read.csv("~/Desktop/KAIST/HF/DEG/SejongIn_Clinical_phenotype_LV_FullROI_N_cellselection_Y_Endothelial_cells_ROI_large_Vent_LV_DsSelect_ICMP__NES_HCMP_Y_OL_N_RE_PID_Fixation.interval_KR_Y2023-06-23conditionICMP-conditionNES_HCMP.csv")
+
+cmc.icmp.es <- read.csv("~/Desktop/KAIST/HF/DEG/SejongIn_Clinical_phenotype_LV_FullROI_N_cellselection_Y_Cardiomyocytes_ROI_large_Vent_LV_DsSelect_ICMP__ES_HCMP_Y_OL_pcaplot_outlier_RE_PID_Institute_Fixation.interval_KR_Y2023-06-23conditionICMP-conditionES_HCMP.csv")
+ec.icmp.es <- read.csv("~/Desktop/KAIST/HF/DEG/SejongIn_Clinical_phenotype_LV_FullROI_N_cellselection_Y_Endothelial_cells_ROI_large_Vent_LV_DsSelect_ICMP__ES_HCMP_Y_OL_pcaplot_outlier_RE_PID_Fixation.interval_KR_Y2023-06-23conditionICMP-conditionES_HCMP.csv")
+
+cmc.es.nes <- read.csv("~/Desktop/KAIST/HF/DEG/SejongIn_Clinical_phenotype_LV_FullROI_N_cellselection_Y_Cardiomyocytes_ROI_large_Vent_LV_DsSelect_ES_HCMP__NES_HCMP_Y_OL_pcaplot_outlier_RE_PID_Fixation.interval_KR_Y2023-06-23conditionES_HCMP-conditionNES_HCMP.csv")
+ec.es.nes <- read.csv("~/Desktop/KAIST/HF/DEG/SejongIn_Clinical_phenotype_LV_FullROI_N_cellselection_Y_Endothelial_cells_ROI_large_Vent_LV_DsSelect_ES_HCMP__NES_HCMP_Y_OL_pcaplot_outlier_RE_PID_Fixation.interval_KR_Y2023-06-23conditionES_HCMP-conditionNES_HCMP.csv")
+
+cmc.deg.list <- list(cmc_dcmp = cmc.dcmp, cmc_icmp = cmc.icmp, cmc_es = cmc.es, cmc_nes = cmc.nes, cmc_dcmp_icmp = cmc.dcmp.icmp, cmc_dcmp_es = cmc.dcmp.es, cmc_dcmp_nes = cmc.dcmp.nes, cmc_icmp_es = cmc.icmp.es, cmc_icmp_nes = cmc.icmp.nes, cmc_es_nes = cmc.es.nes)
+
+ec.deg.list <- list(ec.dcmp, ec.icmp, ec.es, ec.nes, ec.dcmp.icmp, ec.dcmp.es, ec.dcmp.nes, ec.icmp.es, ec.icmp.nes, ec.es.nes)
+```
+
+```{r}
+p <- list()
+
+for (i in 1:length(cmc.deg.list)){
+  cmc.dcmp <- cmc.deg.list[[i]]
+  ec.dcmp <- ec.deg.list[[i]]
+  
+  df1 <- cmc.dcmp %>% select(SYMBOL, logFC, adj.P.Val)
+  df2 <- ec.dcmp %>% select(SYMBOL, logFC, adj.P.Val)
+  df <- merge(df1, df2, by = "SYMBOL", all = T)
+  
+  tmp2 <- df %>% 
+    mutate(logFC.x = case_when(is.na(logFC.x) ~ 0,  TRUE ~ logFC.x),
+           logFC.y = case_when(is.na(logFC.y) ~ 0, TRUE ~ logFC.y),
+           
+           adj.P.Val.y = case_when(is.na(adj.P.Val.y) ~ 1, TRUE ~ adj.P.Val.y),
+           adj.P.Val.x = case_when(is.na(adj.P.Val.x) ~ 1, TRUE ~ adj.P.Val.x),
+           
+           ident = case_when(adj.P.Val.x > 0.05 & adj.P.Val.y > 0.05 ~ "NS_NS",
+                             adj.P.Val.x > 0.05 & adj.P.Val.y <= 0.05 ~ "NS_sig",
+                             adj.P.Val.x <= 0.05 & adj.P.Val.y > 0.05 ~ "sig_NS",
+                             adj.P.Val.x <= 0.05 & adj.P.Val.y <= 0.05 ~ "sig_sig"),
+           
+           gene_label_2 = case_when(grepl("^MT-|RPL|RPS|KRT|IGL|IGK", SYMBOL) ~ "",
+                                    # gene %in% c("CD8A", "CD8B", "CD3D", "CD3E") ~ "",
+                                    ident == "NS_NS" ~ "", TRUE ~ SYMBOL),
+           
+           updown = case_when(logFC.x > 0.5 & adj.P.Val.x < 0.05 & logFC.y > 0.5 & adj.P.Val.y < 0.05 ~ "UP_both",
+                              logFC.x < -0.5 & adj.P.Val.x < 0.05 & logFC.y < -0.5 & adj.P.Val.y < 0.05 ~ "DOWN_both",
+                              logFC.x > 0.5 & adj.P.Val.x < 0.05 ~ "UP_cmc",
+                              logFC.y > 0.5 & adj.P.Val.y < 0.05 ~ "UP_ec", 
+                              logFC.x < -0.5 & adj.P.Val.x < 0.05 ~ "DOWN_cmc",
+                              logFC.y < -0.5 & adj.P.Val.y < 0.05 ~ "DOWN_ec",
+                              TRUE ~ "NO"), 
+           
+           gene_label_3 = case_when(updown != "NO" ~ gene_label_2,
+                                    TRUE ~ NA), 
+           pvalue = case_when(adj.P.Val.x > 0.05 & adj.P.Val.y > 0.05 ~ "NS_NS",
+                              adj.P.Val.x > 0.05 & (adj.P.Val.y > 0.01 & adj.P.Val.y <= 0.05) ~ "NS_sig",
+                              (adj.P.Val.x > 0.01 & adj.P.Val.x <= 0.05) & adj.P.Val.y > 0.05 ~ "sig_NS",
+                              (adj.P.Val.x > 0.01 & adj.P.Val.x <= 0.05) & (adj.P.Val.y > 0.01 & adj.P.Val.y <= 0.05) ~ "sig_sig",
+                              adj.P.Val.x > 0.05 & adj.P.Val.y <= 0.01 ~ "NS_sigX",
+                              adj.P.Val.x <= 0.01 & adj.P.Val.y > 0.05 ~ "sigX_NS",
+                              (adj.P.Val.x > 0.01 & adj.P.Val.x <= 0.05) & adj.P.Val.y <= 0.01 ~ "sig_sigX",
+                              adj.P.Val.x <= 0.01 & (adj.P.Val.y > 0.01 & adj.P.Val.y <= 0.05) ~ "sigX_sig",
+                              adj.P.Val.x <= 0.01 & adj.P.Val.y <= 0.01 ~ "sigX_sigX")
+           
+    ) %>% select(SYMBOL, logFC.x, logFC.y, adj.P.Val.x, adj.P.Val.y, ident, gene_label_2, updown, gene_label_3, pvalue) #%>%  filter(!is.na(gene_label_3))
+  
+  gene <- tmp2[order(tmp2$logFC.x, decreasing = T), ] %>% head(10) %>% pull(gene_label_3)
+  gene <- c(gene, tmp2[order(tmp2$logFC.x, decreasing = F), ] %>% head(10) %>% pull(gene_label_3))
+  gene <- c(gene, tmp2[order(tmp2$logFC.y, decreasing = T), ] %>% head(10) %>% pull(gene_label_3))
+  gene <- c(gene, tmp2[order(tmp2$logFC.y, decreasing = F), ] %>% head(10) %>% pull(gene_label_3))
+  gene <- unique(gene)
+  
+  tmp2 <- tmp2 %>% 
+    mutate(gene_label_4 = case_when(gene_label_3 %in% gene ~ gene_label_3, T ~ ""))%>% 
+    select(SYMBOL, logFC.x, logFC.y, adj.P.Val.x, adj.P.Val.y, ident, gene_label_2, updown, gene_label_3, gene_label_4, pvalue)
+  
+  tmp2 <- tmp2 %>%
+    mutate(pvalue_size = case_when(
+      pvalue == "NS_NS" ~ 1,
+      pvalue == "NS_sig" ~ 2,
+      pvalue == "sig_NS" ~ 2,
+      pvalue == "sig_sig" ~ 2,
+      pvalue == "NS_sigX" ~ 3,
+      pvalue == "sigX_NS" ~ 3,
+      pvalue == "sig_sigX" ~ 3,
+      pvalue == "sigX_sig" ~ 3,
+      pvalue == "sigX_sigX" ~ 3,
+      TRUE ~ 1  # 기본값
+    ),
+    pvalue_final = case_when(
+      updown != "NO" ~ pvalue_size,
+      TRUE ~ 1
+    ))
+  
+  p[[i]] <- ggplot(tmp2, aes(logFC.x, logFC.y, label = gene_label_4, col = updown)) + geom_point(aes(size = pvalue_final)) +
+    geom_text_repel(size = 4, max.overlaps = 1000, colour = "black") +
+    #geom_abline(slope=1, intercept=0) +
+    #scale_color_manual(values = col_func) +
+    geom_vline(xintercept = 0, linetype = "dashed", color = "darkgrey") +
+    geom_hline(yintercept = 0, linetype = "dashed", color = "darkgrey") +
+    theme_classic() + 
+    theme(axis.title = element_text(face = "bold")) +
+    scale_color_manual(values=c("NO" = "#EEEEEE", "DOWN_ec" = "#4DAF4A", "UP_ec" = "#FF7F00", "DOWN_cmc" = "#377EB8", "UP_cmc" = "#E41A1C", "DOWN_both" = "#FFFF33", "UP_both" = "#984EA3")) +
+    xlim(-max(abs(tmp2$logFC.x)), max(abs(tmp2$logFC.x))) + 
+    ylim(-max(abs(tmp2$logFC.y)), max(abs(tmp2$logFC.y))) +
+    scale_size(range = c(1,3))
+
+}
+```
+
+# Supple 11b
+```{r}
+Idents(HF_endo) <- "cellanno"
+
+prop1 <- table(HF_endo$cellanno, HF_endo$orig.ident)
+prop1 <- table(HF_endo$cellanno, HF_endo$condition)
+barplot(prop1)
+barplot(prop.table(prop1, 2))
+prop <- prop.table(prop1, margin = 2) * 100
+
+
+# data를 길게 느려뜨려 주기. frequency도 coloumn으로 들어갈수 있게
+prop1.long <- as.data.frame(prop1)
+colnames(prop1.long) <- c("celltype", "condition_diagnosis", "proportion")
+prop2.long <- prop2.long[order(prop2.long$Var2),]
+
+ggplot(prop1.long, aes(x = condition_diagnosis, y = proportion, fill = celltype)) + 
+  geom_bar(position = "fill", stat = "identity") + 
+  scale_fill_manual(values = c("#9AD0C2", "#1A4D2E", "#DFD0B8", "#B5C0D0", "#98ABEE", "#201658", "#795458", "#C08B5C", "#FFC94A", "#EED3D9")) + 
+  theme(axis.text.x = element_text(angle = 45, hjust = 1)) +
+  theme_bw() +
+  theme(panel.border = element_blank()) +
+  theme(axis.line = element_line(colour = "black", size = 0.8)) +
+  theme(panel.grid = element_blank()) +
+  ylab("") +
+  xlab("") +
+  theme(text = element_text(size=11)) +
+  theme(axis.text.x = element_text(angle = 90, hjust = 1, vjust = 0.5))
+```
+
+# statistical analysis
+```{r}
+# data를 길게 느려뜨려 주기. frequency도 coloumn으로 들어갈수 있게
+prop2.long <- cbind(prop1.long, prop)
+prop2.long <- prop2.long[order(prop2.long$Var2),]
+
+
+prop2 <- table(HF_endo$cellanno, HF_endo$orig.ident, HF_endo$condition)
+df <- as.data.frame(prop2)
+df <- df[!(df$Freq == 0),]
+df <- df[order(df$Var2),]
+prop2.long <- cbind(prop2.long, df)
+prop2.long <- prop2.long[-c(4,5,7,8,10)]
+colnames(prop2.long) <- c("celltype", "condition", "count", "proportion", "condition_diagnosis")
+
+library(ggpubr)
+my_comparisons <- list(c("Donor", "DCM"))
+prop3.long <- prop2.long
+prop3.long <- prop3.long[prop3.long$celltype == "Endothelial cell_inflammation", ]
+ggbarplot(prop3.long, x = "condition_diagnosis", y = "proportion", add = c("mean_se", "jitter")) +
+  stat_compare_means(comparisons = my_comparisons,  method = "wilcox.test")
+```
+

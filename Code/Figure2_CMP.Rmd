@@ -1,0 +1,1519 @@
+---
+title: "Figure2"
+output: html_document
+date: "2024-05-28"
+---
+
+
+## Including Plots
+
+You can also embed plots, for example:
+
+# library
+```{r}
+library("sva")
+library("ggplot2")
+library("gridExtra")
+library("edgeR")
+library("UpSetR")
+library("tidyverse")
+library("BatchQC")
+library("RColorBrewer")
+library("Glimma")
+library("variancePartition")
+library("BiocParallel")
+library("gplots")
+library("NMF")
+library("GO.db")
+library("org.Hs.eg.db")
+library(preprocessCore)
+library(genefilter)
+library(matrixStats)
+library(rafalib)
+library(PCAtools)
+library(Biobase)
+library(GEOquery)
+library(bigutilsr)
+library(spatstat)
+library(matrixStats)
+library(RCurl)
+library(GSA)
+library(RCy3)
+library(fgsea)
+library(data.table)
+# library(plotly) # has conflict with org.Hs.eg.db select
+# library(rrcov) # has conflict with biplot detach(rrcov)
+library(DT) 
+library(grid)
+library(ComplexHeatmap)
+library(cluster)
+
+```
+
+```{r}
+load("~/JH/HF/Spatial_original_basedata.RData")
+```
+
+```{r}
+# ##################################################################
+# 'TMA.block'
+# 'ROI.size'
+# 'Ventricle'
+# 'Segment.id'
+# 'Segment.type' -> "celltype"
+# 'PID'
+# 'Operation'
+# 'Fixation.interval'
+# 'Gender'
+# 'Age'
+# 'Institute'
+# 'Clinical_phenotype_path'
+# 'Clinical_endstage'
+# 'After_LVAD'
+# 'P_Normal'
+# 'P_Degeneration''P_Hypertrophy''P_Disarray''P_Fibrosis''P_peri_infarction''P_etc'
+# 'Echo_date''Echo_LVEF''Echo_LVPWd''Echo_IVSd''Echo_chamber_size''Echo_RWMA''Echo_RV_dysfunction''Echo_AR''Echo_MR''Echo_TR'
+# 'ECG_date''ECG_voltage''ECG_QRS''VTandVF''AF''BNP''Probnp''CardiacMR_DE''Gene'
+# 'ECG_voltage_n''ECG_QRS_n'
+# 'Core.c.fullROI'
+# 'PID.Op''PID.Op.bothblock''ROI.bothsize'
+# 'Clinical_phenotype_LV''Clinical_phenotype_tri''Clinical_phenotype_bi'
+
+
+# Number of core to use for DREAM analysis
+ NoCore = 8 # 8
+
+# Normalization method 
+ nlm = "upperquartile" # "upperquartile"
+
+# # Condition of interest (among column names of met)
+  # COI <- "Clinical_phenotype_bi"   # COI <- "celltype" 
+    COI <- "celltype" 
+# USING ONLY SPECIFIC SET of CORES - For example cores with full ROI 
+  # FullROI_selection <- "Y"
+  FullROI_selection <- "N"
+
+# CELL TYPE SELECTION?
+  celltype_selection <- "N"  # or "N"
+  # celltype_selection <- "Y"  # or "N"
+
+  # Which celltype? 
+  cell_type<- "Cardiomyocytes" # or ...
+
+# ROISIZE SELECTION?
+ ROISIZE_selection <- "Y" # or "N"
+ ROIsize <- "large" # or ...
+
+# VENTRICLE SELECTION?
+    ventricle_selection <- "N"
+    # ventricle_selection <- "Y" # or "N"
+    ventricle_type <- "LV"
+
+# Clinical Disease selection with control samples
+
+    # disease_selection <- "Y"
+    disease_selection <- "N"
+
+    disease_selection_var <- "Clinical_phenotype_LV"
+    disease_type_vector <- c("Control", "ES_HCMP", "NES_HCMP")  ## Clinical_phenotype_LV - 'ES_HCMP''ICMP''Control''DCMP''NES_HCMP'
+    disease_type <- if(disease_selection == "Y") {disease_type = disease_type_vector
+                                                  }else{disease_type= "Non"
+                                                       }
+
+# OUTLIER SELECTION?
+ # if no 
+  grid_set = "Y" 
+  # grid_set = "N"
+
+ # choose which grid set to use from the PCAgrid()
+if (grid_set == "N") {
+    outlier_set = "N"
+    } else {
+    outlier_set =  "pcaplot_outlier" #"pca_grid_10"# "pca_grid_10" # or pca_grid_10, pca_grid_3, etc
+}
+
+RE1 = "PID"
+RE2 = "Institute"
+RE3 = "Fixation.interval"
+# RE4 = "P_Normal"
+# RE4 = "Clinical_phenotype_LV"
+# RE4 = "..." 
+#...
+
+if (exists("RE4")==TRUE) {
+    (form <- formula(paste("~", "condition + (1|", RE1, ") + (1|", RE2, ") + (1|", RE3, ") + (1|", RE4, ")", collapse="")))
+    (form_cont <- formula(paste("~ 0 +", "condition + (1|", RE1, ") + (1|", RE2, ") + (1|", RE3, ") + (1|", RE4, ")", collapse="")))
+# RE names
+    (RE_names <- paste(RE1, RE2, RE3, RE4, sep="_"))
+    }else{
+    if (exists("RE3")==TRUE) {
+        (form <- formula(paste("~", "condition + (1|", RE1, ") + (1|", RE2, ") + (1|", RE3, ")", collapse="")))
+        (form_cont <- formula(paste("~ 0 +", "condition + (1|", RE1, ") + (1|", RE2, ") + (1|", RE3, ")", collapse="")))
+
+# RE names
+        (RE_names <- paste(RE1, RE2, RE3, sep="_"))
+        }else{
+        if (exists("RE2")==TRUE) {
+            (form <- formula(paste("~", "condition + (1|", RE1, ") + (1|", RE2, ")", collapse="")))
+            (form_cont <- formula(paste("~ 0 +", "condition + (1|", RE1, ") + (1|", RE2, ")", collapse="")))
+
+# RE names
+            (RE_names <- paste(RE1, RE2, sep="_"))
+            }else{
+            if (exists("RE1")==TRUE) {
+                (form <- formula(paste("~", "condition + (1|", RE1, ")", collapse="")))
+                (form_cont <- formula(paste("~ 0 +", "condition + (1|", RE1, ")", collapse="")))
+
+# RE names
+                (RE_names <- paste(RE1, sep="_"))
+                }else{
+                (form <- formula(paste("~", "condition", collapse="")))
+                (form_cont <- formula(paste("~ 0 +", "condition", collapse="")))
+
+# RE names
+                (RE_names <- paste(No, sep="_"))
+                }
+        }
+    }
+}
+                
+# Decide Contrast for DREAM
+
+#makecontrastasroutine <- "celltype_comwith_othercells" 
+# makecontrastasroutine <- "Forclinicaldisease" # or "Y" to make it according to the number of condition
+# makecontrastasroutine <- "Y" #to make it according to the number of condition
+
+# Small sample number analysis 
+ KRanaly <- "Y"
+ # KRanaly <- "N"
+# Order of batch correction
+# Cell-type selection -> Batch correction
+
+# Outlier 
+# remove Sejong
+# Normalization method = Upper quartile 
+# ##################################################################
+```
+
+```{r}
+(Analysis_name = paste("SejongIn_", COI, "_FullROI_", FullROI_selection, 
+                      "_cellselection_", celltype_selection,
+                                "_", cell_type, 
+                                "_ROI_", ROIsize,
+                                "_Vent_", ventricle_type,
+                                "_DsSelect_", paste0(disease_type, "_", collapse="_"), disease_selection, 
+                                "_", "OL_", outlier_set,
+                                "_RE_", RE_names,
+                                "_KR_", KRanaly,
+                      Sys.Date(), sep=""))
+```
+
+# INPUT DATA
+
+##  Input data - new 
+
+```{r}
+# Decide Input file
+Input_expr_data = "Probe_QC_1percfilter.csv"
+Input_pheno_data = "Spatial_Annotation.csv"
+
+# Read Input files
+exp_qc <- read.csv(Input_expr_data, row.names = 1, header = TRUE, stringsAsFactors=FALSE)
+met_tmp<- read.csv(Input_pheno_data, header=TRUE, stringsAsFactors=FALSE)
+```
+
+```{r}
+# Refine met file to match expression file
+met_tmp1 <- met_tmp %>% mutate(Name=paste(Scan.name, formatC(ROI..label., width=3, flag="0"), Segment..Name..Label., sep="..."))
+rownames(met_tmp1)<- gsub(' ', '.', met_tmp1$Name)
+
+met<-met_tmp1[match(colnames(exp_qc), rownames(met_tmp1)),]
+identical(colnames(exp_qc), rownames(met))
+
+met <- met %>% mutate(TMA.block = factor(TMA.block))
+```
+
+```{r}
+# define celltype
+celltype <- as.factor(met$Segment..Name..Label.)
+celltype <- gsub("Full ROI", "No_Seg",celltype) 
+celltype <- gsub("Trp", "CMC", celltype)
+celltype <- gsub("vessel", "EC", celltype)
+celltype <- gsub("fb", "FB", celltype)
+```
+
+```{r}
+met <- cbind(met, celltype)
+```
+
+## Remove negative probe
+
+```{r}
+negprobe=which(rownames(exp_qc)%in%"NegProbe-WTX")
+
+class(negprobe)
+
+exp_rmnp <- exp_qc[-negprobe,]
+dim(exp_rmnp)
+dim(exp_qc)
+```
+
+## GENE ANNOTATION (GENEID)
+
+```{r}
+if ("plotly" %in% tolower((.packages())) == TRUE) {
+    detach("package:plotly", unload=TRUE)
+    }
+```
+
+```{r}
+# select makes error with clusterProfiler
+if ("clusterProfiler" %in% (.packages()) == TRUE) {
+detach("package:clusterProfiler", unload=TRUE)
+    }
+```
+
+```{r}
+symbols <- rownames(exp_rmnp)
+```
+
+```{r}
+fdata <- select(org.Hs.eg.db, symbols, c("ENTREZID", "GENENAME"), "SYMBOL")
+```
+
+```{r}
+identical(fdata$SYMBOL,symbols)
+```
+
+```{r}
+## There are duplicates and missing
+```
+
+```{r}
+## first remove duplicates
+```
+
+```{r}
+## MENO1 take 51072 according to nanostring excel information
+```
+
+```{r}
+which(fdata$SYMBOL=="MEMO1")
+```
+
+```{r}
+fdata_nodup <- fdata[-17,]
+```
+
+```{r}
+dim(fdata_nodup)
+```
+
+```{r}
+which(fdata_nodup$SYMBOL=="MEMO1")
+```
+
+```{r}
+## Replace Missing ENTREZIDs with IDs in Geomx file
+```
+
+```{r}
+symbols_noID<-fdata_nodup$SYMBOL[which(is.na(fdata_nodup$ENTREZID))]
+length(symbols_noID)
+```
+
+```{r}
+gene_list = "gene_list.csv"
+geomx_gene <-read.csv(gene_list, header=TRUE, stringsAsFactors=FALSE)
+```
+
+```{r}
+geomx_glist<-geomx_gene[,c("TargetName","GeneID")]
+```
+
+```{r}
+missing_geomx <- geomx_glist$TargetName[which(geomx_glist$TargetName%in%symbols_noID)]
+length(which(geomx_glist$TargetName%in%symbols_noID))
+```
+
+```{r}
+missing_glist<-geomx_glist[which(geomx_glist$TargetName%in%symbols_noID),]
+```
+
+```{r}
+reorder_missing_glist<-missing_glist[match(symbols_noID,missing_geomx),]
+identical(reorder_missing_glist$TargetName, symbols_noID)
+
+# fdata_nodup$ENTREZID[which(is.na(fdata_nodup$ENTREZID))]<-missing_geomx_tb$GeneID
+```
+
+```{r}
+fdata_nodup$ENTREZID[which(is.na(fdata_nodup$ENTREZID))] <- reorder_missing_glist$GeneID
+```
+
+### check duplicated IDs
+
+```{r}
+test_dupl<-fdata_nodup[order(fdata_nodup$ENTREZID),]
+head(test_dupl)
+```
+
+```{r}
+which(duplicated(test_dupl$ENTREZID)==TRUE)
+```
+
+```{r}
+duplicated_fdata<-test_dupl[duplicated(test_dupl$ENTREZID)|duplicated(test_dupl$ENTREZID, fromLast=TRUE),]
+```
+
+```{r}
+duplicated_fdata
+```
+
+```{r}
+## confirmed that there is no duplicates
+```
+
+### If wants to change rownames to ENTREZID
+
+```{r}
+# rownames(e_abc)<-fdata_nodup$ENTREZID
+```
+
+## Three data sets
+
+```{r}
+Input_for_bc = exp_rmnp
+```
+
+```{r}
+e_bbc <- Input_for_bc # before batch correction 
+
+f <- fdata_nodup
+p <- met
+```
+
+```{r}
+unique(p$Segment.id)
+```
+
+```{r}
+identical(f$SYMBOL,symbols)
+```
+
+```{r}
+d_p <- DGEList(e_bbc)
+d_pq3 <- calcNormFactors(d_p, method="upperquartile")
+d_pq3cpm <- cpm(d_pq3, log=FALSE)
+```
+
+# GROUP SELECTION & BATCH CORRECTION
+
+## Select Full-ROI set
+
+```{r}
+ X0="Core.c.fullROI"
+ Y0="Yes"
+ W0="p"
+ Z0="e_bbc" 
+if (FullROI_selection == "Y") {
+
+select_group(X0,Y0,W0,Z0)
+
+output_p0 = get(paste(W0, "_", Y0, sep=""))
+output_e0 = get(paste(Z0, "_", Y0, sep=""))
+    } else {
+    output_p0 = get(W0)
+    output_e0 = get(Z0)
+    }
+```
+
+## Select Cell-type 
+
+```{r}
+ X1="Segment.id"
+ Y1= cell_type
+ W1="output_p0"
+ Z1="output_e0"
+
+if (celltype_selection == "Y") {
+
+select_group(X1,Y1,W1,Z1)
+
+output_p1 = get(paste(W1, "_", Y1, sep=""))
+output_e1 = get(paste(Z1, "_", Y1, sep=""))
+    } else {
+    output_p1 = get(W1)
+    output_e1 = get(Z1)
+    }
+```
+
+## Batch Correction (TMA.block)
+
+### BatchQC before batchcorrection
+
+```{r}
+output_e1_prenormal <- newSeqExpressionSet(as.matrix(output_e1), phenoData = output_p1)
+output_e1_q3 <- betweenLaneNormalization(output_e1_prenormal, which ="upper")
+```
+
+```{r}
+## BatchQC before correcting batch effect
+batch = output_p1$TMA.block
+condition = output_p1$Segment.type
+batchQC(dat=normCounts(output_e1_q3), batch=batch, condition=condition,
+        report_file="Supplemental_Figure1_beforebatchcorrection_20230621.html", report_dir=".",
+        report_option_binary="111111111",
+        view_report=TRUE, interactive=TRUE, batchqc_output=TRUE)
+```
+
+### Batch correction
+
+```{r}
+# select COI
+condition = output_p1[[COI]]
+```
+
+```{r}
+# Input data
+Input_for_bc_2 = output_e1
+#perform the batch correction
+batch = output_p1$TMA.block
+##** need to correct condition according to the phenotype interesting
+# condition = p_Cardiomyocytes$P_Normal
+
+#groups = sapply(as.character(condition), switch, "Full ROI" = 1, "Trp" = 2, "vessel" = 3, "fb" = 4, USE.NAMES = F)
+batches = sapply(as.character(batch), switch, "1" = 1, "2" = 2, USE.NAMES = F)
+output_bc = ComBat_seq(counts = as.matrix(Input_for_bc_2), batch = batches, group = condition)
+```
+
+```{r}
+### BatchQC after batchcorrection
+```
+
+```{r}
+output_bc_prenormal <- newSeqExpressionSet(as.matrix(output_bc), phenoData = output_p1)
+output_bc_q3 <- betweenLaneNormalization(output_bc_prenormal, which ="upper")
+```
+
+```{r}
+## BatchQC before correcting batch effect
+batch = output_p1$TMA.block
+condition = output_p1$Segment.type
+batchQC(dat=normCounts(output_bc_q3), batch=batch, condition=condition,
+        report_file="Supplemental_Figure1_afterbatchcorrection_20230621.html", report_dir=".",
+        report_option_binary="111111111",
+        view_report=TRUE, interactive=TRUE, batchqc_output=TRUE)
+```
+
+## Select Large and LV only ROI.size=='large'
+
+```{r}
+    X2="ROI.size"
+    Y2= ROIsize
+    W2="output_p1"
+    Z2="output_bc"
+## select Large and LV only ROI.size=='large'
+if (ROISIZE_selection == "Y") {
+    
+    select_group(X2,Y2,W2,Z2)
+    
+    output_p2 = get(paste(W2, "_", Y2, sep=""))
+    output_e2 = get(paste(Z2, "_", Y2, sep=""))
+} else {
+    output_p2 = get(W2)
+    output_e2 = get(Z2)
+}
+```
+
+## Select Large and LV only Ventricle=='LV'
+
+```{r}
+    X3="Ventricle"
+    Y3=ventricle_type
+    W3="output_p2"
+    Z3="output_e2"
+# input = output of above cell
+
+if (ventricle_selection == "Y") {
+    select_group(X3,Y3,W3,Z3)
+    
+    output_p5 = get(paste(W3, "_", Y3, sep=""))
+    output_e5 = get(paste(Z3, "_", Y3, sep=""))
+    } else {
+    output_p5 = get(W3)
+    output_e5 = get(Z3)
+    }
+```
+
+## Select Specific Disease and Control samples
+
+```{r}
+X5=disease_selection_var
+Y5="disease_type"
+W5="output_p5"
+Z5="output_e5"
+
+if (disease_selection == "Y") {
+    select_group_m(X5,Y5,W5,Z5)
+    
+    output_p3 = get(paste(W5, "_", Y5, sep=""))
+    output_e3 = get(paste(Z5, "_", Y5, sep=""))
+    } else {
+    output_p3 = get(W5)
+    output_e3 = get(Z5)
+    }
+```
+
+# Intermediate DATA INPUT
+
+```{r}
+d_1 <- DGEList(output_e3)
+```
+
+### Add normalization factors
+
+```{r}
+d_1q3 <- calcNormFactors(d_1, method="upperquartile")
+# d_1tmm <- calcNormFactors(d_1)
+```
+
+```{r}
+dim(d_1)
+```
+
+```{r}
+head(d_1)
+```
+
+# PCA ANALYSIS
+
+```{r}
+if ("rrcov" %in% tolower((.packages())) == TRUE) {
+    detach("package:rrcov", unload=TRUE)
+    }
+```
+
+```{r}
+d_1q3cpm<-cpm(d_1q3, log=FALSE)
+```
+
+```{r}
+e.list <- list(d_1q3cpm)
+```
+
+```{r}
+pca.list <- lapply(e.list, function(x) pca(x, metadata=output_p3, removeVar = 0.1, scale = TRUE))
+```
+
+
+# OUTLIER
+
+## Outlier removal according to PCA plot
+
+```{r}
+pca2_tmp<-pca.list[[1]]$rotated[2]
+pcaplot_outlier <-rownames(pca2_tmp)[pca2_tmp$PC2>(50)]
+
+pcaplot_outlier
+```
+
+```{r}
+dim(output_e3)
+```
+
+```{r}
+Y4="output_p3"
+Z4="output_e3"
+
+if (grid_set == "N") {
+    output_p4 = get(Y4)
+    output_e4 = get(Z4)
+    } else {
+    if (grepl("pcaplot", outlier_set)==TRUE) {
+        X4=outlier_set
+        } else {
+        grid_set = get(outlier_set)
+        sp_gridflag <-names(grid_set$flag[grid_set$flag==FALSE])
+        X4="sp_gridflag"
+        }
+    remove_sample(X4,Y4,Z4)
+    output_p4 = get(paste(Y4, "_rm_", X4, sep=""))
+    output_e4 = get(paste(Z4, "_rm_", X4, sep=""))
+    }
+```
+
+# FINAL DATA INPUT
+
+```{r}
+d0 <- DGEList(output_e4)
+m <- output_p4
+e <- output_e4
+f <- fdata_nodup
+d0$genes <- f
+```
+
+### Add features of samples in "samples"
+
+```{r}
+d0$samples$celltype <- m$celltype
+
+PID <- as.factor(m$PID)
+d0$samples$PID <- PID
+
+condition <- as.factor(m[[COI]])
+d0$samples$condition <- condition
+
+### remove after confirmation
+
+# Ds <- as.factor(m$Clinical_phenotype_2nd)
+# d0$samples$Ds <- Ds
+
+# levels(condition) <- c("Non_Endstage", "End_stage")
+m <- cbind(m, condition)
+```
+
+### Add normalization factors
+
+```{r}
+d1 <- calcNormFactors(d0, method="upperquartile")
+```
+
+# Heatmaps and PCA plot after all
+
+## Heatmaps with lcpm
+
+```{r}
+logcounts <- cpm(d1, log=TRUE)
+```
+
+## Figure 2a UMAP
+```{r}
+# update defaults for umap to contain a stable random_state (seed)
+custom_umap <- umap::umap.defaults
+custom_umap$n_neighbors <- 43
+custom_umap$n_components <- 2
+custom_umap$n_epochs <- 500
+custom_umap$random_state <- 42
+
+logcounts2 <- read.csv("~/JH/HF/logcpmnorm.csv")
+rownames(logcounts2) <- logcounts2[,1]
+logcounts2 <- logcounts2[,-1]
+
+# run UMAP
+#colnames(logcounts) <- gsub("...", " \\| ", colnames(logcounts))
+umap_out <- umap(t(logcounts2), config = custom_umap)
+
+#pData(target_demoData)[, c("UMAP1", "UMAP2")] <- umap_out$layout[, c(1,2)]
+m[, c("UMAP1", "UMAP2")] <- umap_out$layout[,c(1,2)]
+
+m$clinic_seg <- paste0(m$celltype, "_", m$Clinical_phenotype_bi)
+m$clinic_seg2 <- m$clinic_seg
+m$clinic_seg2 <- factor(m$clinic_seg2, 
+                        levels = c("CMC_Control", "CMC_Diseased", "EC_Control", "EC_Diseased", "FB_Control", "FB_Diseased", "No_Seg_Control", "No_Seg_Diseased"),
+                        labels = c("CMC", "CMC", "EC_Control", "EC_Diseased", "FB", "FB", "No_Seg", "No_Seg"))
+
+
+m <- m %>% mutate(ClinicalNHist_Control = ifelse(Clinical_phenotype_bi == "Control", "Control_Clin", 
+                                                     ifelse(P_Normal == "1" & Clinical_phenotype_bi == "Diseased", "Control_His", "Diseased"))
+)
+
+m <- m %>% mutate(ClinicalNHist_Control2 = ifelse(Clinical_phenotype_LV == "Control", "Control_Clin", 
+                                                      ifelse(P_Normal == "1" & Clinical_phenotype_LV != "Control", "Control_His", 
+                                                             ifelse(Clinical_phenotype_LV == "NES_HCMP", "Diseased_NES", "Diseased_ES")))
+)
+
+m$histo_seg <- paste0(m$celltype, "_", m$ClinicalNHist_Control2)
+m$histo_seg2 <- m$histo_seg
+m$histo_seg2 <- factor(m$histo_seg2, 
+                        levels = c("CMC_Control_Clin", "CMC_Control_His", "CMC_Diseased_NES", "CMC_Diseased_ES", "EC_Control_Clin", "EC_Control_His", "EC_Diseased_NES", "EC_Diseased_ES", "FB_Control_Clin", "FB_Diseased_NES", "FB_Diseased_ES", "No_Seg_Control_Clin", "No_Seg_Control_His", "No_Seg_Diseased_NES", "No_Seg_Diseased_NES"),
+                        labels = c("CMC", "CMC", "CMC", "CMC", "EC_Control", "EC_Control", "EC_Diseased", "EC_Diseased", "FB", "FB", "FB", "No_Seg", "No_Seg", "No_Seg", "No_Seg"))
+
+m$crude_seg <- paste0(m$celltype, "_", m$his)
+
+
+ggplot(m,
+       aes(x = UMAP1, y = UMAP2, color = Segment..Name..Label.)) +
+  scale_color_manual(values = c("#E9C874","#A8D1D1","#FD8A8A", "#9EA1D4")) + 
+  geom_point(size = 3) +
+  theme_bw() + 
+  theme_classic2()
+
+
+ggplot(m,
+       aes(x = UMAP1, y = UMAP2, color = clinic_seg2)) +
+  scale_color_manual(values = c("CMC" = "#FD8A8A", "EC_Control" = "#3C3E7B", "EC_Diseased" = "#D7DAF0", "FB" = "#E9C874", "No_Seg" = "#A8D1D1")) + 
+  geom_point(size = 3) +
+  theme_bw() + 
+  theme_classic2()
+```
+
+
+# Figure 2b
+
+```{r}
+if ("rrcov" %in% tolower((.packages())) == TRUE) {
+    detach("package:rrcov", unload=TRUE)
+    }
+```
+
+```{r}
+nonlogcounts <- cpm(d1, log=FALSE)
+```
+
+```{r}
+e.list_final <- list(logcounts)
+```
+
+```{r}
+m <- m %>% mutate(BNP_pca = ifelse(is.na(BNP)==TRUE, min(m$BNP, na.rm=TRUE), BNP))
+```
+
+```{r}
+m <- m %>% mutate(Echo_pca = ifelse(is.na(Echo_LVEF)==TRUE, max(m$Echo_LVEF, na.rm=TRUE), Echo_LVEF))
+```
+
+```{r}
+m_pca <- m
+```
+
+```{r}
+names(m_pca)[grepl("BNP_pca", names(m_pca))] <- "BNP(pg/ml)"
+```
+
+```{r}
+names(m_pca)[grepl("Echo_pca", names(m_pca))] <- "LVEF(%)"
+names(m_pca)[grepl("Clinical_phenotype_LV", names(m_pca))] <- "Clinical classification"
+names(m_pca)[grepl("P_Normal", names(m_pca))] <- "Histologically normal"
+names(m_pca)[grepl("P_Degeneration", names(m_pca))] <- "Histology-Degeneration"
+names(m_pca)[grepl("P_Hypertrophy", names(m_pca))] <- "Histology-Hypertrophy"
+names(m_pca)[grepl("P_Fibrosis", names(m_pca))] <- "Histology-Fibrosis"
+names(m_pca)[grepl("P_Disarray", names(m_pca))] <- "Histology-Disarray"
+names(m_pca)[grepl("Fixation.interval", names(m_pca))] <- "Fixation interval"
+names(m_pca)[grepl("TMA.block", names(m_pca))] <- "TMA block"
+names(m_pca)[grepl("celltype", names(m_pca))] <- "Cell-type"
+```
+
+```{r}
+
+pca.list_final <- lapply(e.list_final, function(x) pca(x, metadata=m_pca, removeVar = 0, scale = F))
+                         
+                         
+```
+
+## 3d pca plot
+```{r}
+components <- pca.list_final[[1]]
+components <- components$rotated
+components <- components[,1:3]
+components <- cbind(components, pca.list_final[[1]]$metadata$Segment..Name..Label.)
+components$PC2 <- -components$PC2
+components$PC3 <- -components$PC3
+
+plot_ly(components, x = ~PC1, y=~PC2, z = ~PC3, color = ~pca.list_final[[1]]$metadata$Segment..Name..Label., colors = c("#E9C874","#A8D1D1","#FD8A8A", "#9EA1D4"))  %>% 
+  add_markers(size = 12) %>% 
+  layout(scene = list(
+    xaxis = list(
+      title = "",
+      ticks = '',
+      showticklabels = F
+    ),
+    yaxis = list(
+      title = "",
+      ticks = '',
+      showticklabels = F
+    ),
+    zaxis = list(
+      title = "",
+      ticks = '',
+      showticklabels = F
+    )
+    )
+  )
+
+```
+
+# Figure 2c
+```{r}
+library(corrplot)
+```
+
+```{r}
+nature_cvr <- load("~/HF/HF_cvr/GSE183852_DCM_Integrated.Robj")
+
+Idents(nature_cvr) <- "tech"
+HF_cvr_sn <- subset(nature_cvr, idents = "SN")
+
+Idents(HF_cvr_sn) <- "Names"
+
+HF_cvr_sn2 <- subset(HF_cvr_sn, idents = c("Cardiomyocytes", "Endothelium", "Fibroblasts", "Pericytes", "Smooth_Muscle", "Myeloid", "NK/T-Cells", "B-Cells", "Neurons", "Lymphatic", "Mast", "Adipocytes"))
+
+my_cvr_order <- c("Cardiomyocytes", "Endothelium", "Fibroblasts", "Pericytes", "Smooth_Muscle", "Myeloid", "NK/T-Cells", "B-Cells", "Neurons", "Lymphatic", "Mast", "Adipocytes")
+
+marker <- read.csv("~/JH/HF/HF_cvr_sn_marker.csv")
+
+marker$cluster <- factor(marker$cluster,
+                         levels = my_cvr_order)
+marker <- marker[order(marker$cluster),]
+marker.1 <- marker[abs(marker$avg_log2FC) > 1, ]
+marker.1 <- marker.1$gene
+marker.1 <- unique(marker.1)
+
+geomx_gene <- rownames(logcounts)
+common.genes <- intersect(geomx_gene, marker.1)
+
+logcounts_trp <- logcounts[,grepl("Trp", colnames(logcounts))]
+logcounts_ves <- logcounts[,grepl("vessel", colnames(logcounts))]
+logcounts_fib <- logcounts[,grepl("fb", colnames(logcounts))]
+logcounts_no <- logcounts[,grepl("ROI", colnames(logcounts))]
+
+mean.trp <- rowMeans(logcounts_trp, na.rm = T)
+mean.ves <- rowMeans(logcounts_ves, na.rm = T)
+mean.fb <- rowMeans(logcounts_fib, na.rm = T)
+mean.no <- rowMeans(logcounts_no, na.rm = T)
+
+logcounts_trp <- cbind(logcounts_trp, mean.trp)
+logcounts_trp <- as.data.frame(logcounts_trp)
+logcounts_trp <- logcounts_trp[rownames(logcounts_trp) %in% common.genes,]
+logcounts_trp$region <- "cardiomyocyte_ROI"
+logcounts_mean_trp <- logcounts_trp[,84:85]
+
+logcounts_ves <- cbind(logcounts_ves, mean.ves)
+logcounts_ves <- as.data.frame(logcounts_ves)
+logcounts_ves <- logcounts_ves[rownames(logcounts_ves) %in% common.genes,]
+logcounts_ves$region <- "endothelial_ROI"
+logcounts_mean_ves <- logcounts_ves[,46:47]
+
+logcounts_fib <- cbind(logcounts_fib, mean.fb)
+logcounts_fib <- as.data.frame(logcounts_fib)
+logcounts_fib <- logcounts_fib[rownames(logcounts_fib) %in% common.genes,]
+logcounts_fib$region <- "fibroblast_ROI"
+logcounts_mean_fib <- logcounts_fib[,14:15]
+
+logcounts_no <- cbind(logcounts_no, mean.no)
+logcounts_no <- as.data.frame(logcounts_no)
+logcounts_no <- logcounts_no[rownames(logcounts_no) %in% common.genes,]
+logcounts_no$region <- "nosegment_ROI"
+logcounts_mean_no <- logcounts_no[,17:18]
+
+logcounts_mean_merge <- cbind(logcounts_mean_trp, logcounts_mean_ves, logcounts_mean_fib, logcounts_mean_no)
+logcounts_mean_merge <- logcounts_mean_merge[,c(1,3,5,7)]
+```
+
+```{r}
+#Intersect all variable genes
+
+DefaultAssay(HF_cvr_sn2) <- "RNA"
+HF_cvr_sn2 <- NormalizeData(HF_cvr_sn2) %>% 
+  FindVariableFeatures(selection.method = "vst", nfeatures = 3000) %>% 
+  ScaleData()
+Idents(HF_cvr_sn2) <- "Names"
+HF_cvr_sn2$Names <- factor(HF_cvr_sn2$Names,
+                           levels = my_cvr_order)
+avr.scaid <- AverageExpression(HF_cvr_sn2, features = common.genes, slot = "scale.data")
+
+avr.scaid <- avr.scaid$RNA
+avr.scaid.sct <- rownames(avr.scaid)
+logcounts_mean_merge_sct <- logcounts_mean_merge[avr.scaid.sct,]
+avr.scaid <- avr.scaid[,my_cvr_order]
+
+
+ave.cor<-cor(cbind(logcounts_mean_merge_sct, avr.scaid))
+ave.cor <- ave.cor[1:4, 5:16]
+
+
+col2 <- colorRampPalette(c("#053061","#2166AC","#4393C3","#92C5DE","#D1E5F0","#FFFFFF","#FDDBC7","#F4A582","#D6604D","#B2182B","#67001F"))
+corrplot(ave.cor, col = col2(500),  method="color",order = "original", cl.lim=c(-2,2))
+```
+
+# spatial deconvolution
+```{r}
+library(NanoStringNCTools)
+library(SpatialDecon)
+```
+
+```{r}
+kropski_colour = c("Cardiomyocytes" = "#FD8A8A", "Endothelium" = "#9EA1D4", "Fibroblasts"= "#E9C874", "Pericytes" = "#007F73", "Smooth_Muscle" = "#5ec3cb", "Myeloid" = "#4CCD99", "NK/T-Cells" = "#240A34", "B-Cells" = "#490685", "Neurons" = "#29506c", "Lymphatic" = "#f02dc7", "Mast" = "#FDAF7B", "Adipocytes" = "#FFEDD8")
+```
+
+```{r}
+finalROI <- rownames(m)
+selectmtx <- HF_cvr_sn2@assays$RNA@counts
+selectmtx.1 <- selectmtx[marker.1,]
+
+annots <- data.frame(cbind(cellType = as.character(Idents(HF_cvr_sn2))), cellID = names(Idents(HF_cvr_sn2)))
+
+custom_mtx_seurat <- create_profile_matrix(mtx = selectmtx.1,
+                                           cellAnnots = annots,
+                                           cellTypeCol = "cellType",
+                                           cellNameCol = "cellID",
+                                           matrixName = "custom_nature",
+                                           outDir = NULL,
+                                           normalize = T,
+                                           minCellNum = 5,
+                                           minGenes = 10,
+                                           scalingFactor = 1,
+                                           discardCellTypes = F)
+
+cell_order <- c("Cardiomyocytes", "Endothelium", "Fibroblasts", "Pericytes", "Smooth_Muscle", "Myeloid", "NK/T-Cells", "B-Cells", "Neurons", "Lymphatic", "Mast", "Adipocytes")
+
+finalROI.trp <- finalROI[grepl("Trp", finalROI)]
+finalROI.ves <- finalROI[grepl("vessel", finalROI)]
+finalROI.fb <- finalROI[grepl("fb", finalROI)]
+finalROI.no <- finalROI[grepl("Full.ROI", finalROI)]
+finalROI_order <- c(finalROI.trp, finalROI.ves, finalROI.fb, finalROI.no)
+
+custom_mtx_seurat <- custom_mtx_seurat[,cell_order]
+order <- colnames(custom_mtx_seurat)
+
+
+```
+
+```{r}
+## normalization 을 negative probe를 포함시켜서
+## 그럼 바꿔야할 것 : counts, fdata
+orig.data <- read.csv("~/JH/HF/Probe_QC_1perfilter_BC.csv")
+rownames(orig.data) <- orig.data[,1]
+orig.data <- orig.data[,2:179]
+orig.data.final <- orig.data[,finalROI]
+
+negprobe_matrix <- data.frame(SYMBOL = "NegProbe-WTX", ENTREZID = NA, GENENAME = NA)
+fdata_3647 <- fdata_nodup[1:3647,]
+fdata_3649 <- fdata_nodup[3648:12800,]
+fdata_neg <- rbind(fdata_3647, negprobe_matrix,fdata_3649)
+```
+
+```{r}
+d_spatial <- DGEList(orig.data.final)
+m_spatial <- output_p4
+e_spatial <- orig.data.final
+f_spatial <- fdata_neg
+d_spatial$genes <- f_spatial
+```
+
+```{r}
+d_spatial$samples$celltype <- m_spatial$celltype
+
+PID <- as.factor(m_spatial$PID)
+d_spatial$samples$PID <- PID
+
+condition <- as.factor(m_spatial[[COI]])
+d_spatial$samples$condition <- condition
+
+### remove after confirmation
+
+# Ds <- as.factor(m$Clinical_phenotype_2nd)
+# d0$samples$Ds <- Ds
+
+# levels(condition) <- c("Non_Endstage", "End_stage")
+m_spatial <- cbind(m_spatial, condition)
+```
+
+### Add normalization factors
+
+```{r}
+d_spatial_1 <- calcNormFactors(d_spatial, method="upperquartile")
+```
+
+
+```{r}
+logcpmnorm_with_neg <- cpm(d_spatial_1, log=F)
+```
+
+```{r}
+bg = derive_GeoMx_background(norm = nonlogcounts,
+                             probepool = rep(1, nrow(nonlogcounts)),
+                             negnames = c("NegProbe-WTX"))
+
+res.nuc <- spatialdecon(norm = nonlogcounts,
+                        bg = bg,
+                        X = custom_mtx_seurat,
+                        align_genes = T,
+                        cell_counts = segmentinfo$AOINucleiCount)
+```
+
+# Figure 2d
+```{r}
+poa <- res.nuc$prop_of_all
+poa <- as.data.frame(t(poa))
+inds.ct <- match(order, colnames(poa))
+all(rownames(poa) == m$X)
+poa$Region <- m$Segment.id
+poa.ro <- poa[,c(inds.ct)]
+poa.ro$ids <- rownames(poa.ro)
+poa.ro$Region <- m$Segment.id
+
+inds.region <- sapply(levels(poa.ro$Region), function(x) {
+  grep(x, poa.ro$Region)
+}) %>% unlist()
+
+poa.order <- poa.ro[finalROI_order,]
+res.melt <- melt(poa.order)
+res.melt$ids <- factor(res.melt$ids, levels = poa.order$ids)
+res.melt <- res.melt[order(res.melt$ids),]
+res.melt$ids <- factor(res.melt$ids, levels = unique(res.melt$ids))
+ggplot(res.melt, aes(x = ids, y = value, fill = variable)) +
+  theme_bw() +
+  geom_col() +
+  theme(panel.border = element_blank()) +
+  theme(axis.line = element_line(colour = "black", size = 1.2)) +
+  theme(panel.grid = element_blank()) +
+  ylab("Proportion of Cells") +
+  xlab("") +
+  theme(text = element_text(size=11)) +
+  theme(axis.text.x = element_text(angle = 90, hjust = 1, vjust = 0.5)) +
+  scale_y_continuous(expand = expansion(mult = c(0, 0))) +
+  guides(fill = guide_legend(ncol = 1)) +
+  theme(legend.key.height = unit(10, units = 'pt')) +
+  scale_fill_manual(values = kropski_colour, name = "Cell Type")
+```
+
+# proportion
+```{r}
+proportion <- poa
+all(rownames(proportion) == m$X)
+
+prop.cmc <- proportion[proportion$Region == "Cardiomyocytes",]
+prop.cmc <- prop.cmc[,1:12]
+prop.ves <- proportion[proportion$Region == "Endothelial_cells",]
+prop.ves <- prop.ves[,1:12]
+prop.fb <- proportion[proportion$Region == "Fibroblasts",]
+prop.fb <- prop.fb[, 1:12]
+prop.no <- proportion[proportion$Region == "No_segmentation",]
+prop.no <- prop.no[, 1:12]
+
+cmc.sum <- colSums(prop.cmc)/83
+cmc.sum <- as.data.frame(cmc.sum)
+cmc.sum$celltype <- rownames(cmc.sum)
+colnames(cmc.sum) <- c("proportion", "celltype")
+cmc.sum$celltype <- factor(cmc.sum$celltype,
+                           levels = c("Cardiomyocytes", "Endothelium", "Fibroblasts", "Pericytes", "Smooth_Muscle", "Myeloid", "NK/T-Cells", "B-Cells", "Neurons", "Lymphatic", "Mast", "Adipocytes"))
+
+
+ves.sum <- colSums(prop.ves)/45
+ves.sum <- as.data.frame(ves.sum)
+ves.sum$celltype <- rownames(ves.sum)
+colnames(ves.sum) <- c("proportion", "celltype")
+ves.sum$celltype <- factor(ves.sum$celltype,
+                           levels = c("Cardiomyocytes", "Endothelium", "Fibroblasts", "Pericytes", "Smooth_Muscle", "Myeloid", "NK/T-Cells", "B-Cells", "Neurons", "Lymphatic", "Mast", "Adipocytes"))
+
+
+fb.sum <- colSums(prop.fb)/13
+fb.sum <- as.data.frame(fb.sum)
+fb.sum$celltype <- rownames(fb.sum)
+colnames(fb.sum) <- c("proportion", "celltype")
+fb.sum$celltype <- factor(fb.sum$celltype,
+                          levels = c("Cardiomyocytes", "Endothelium", "Fibroblasts", "Pericytes", "Smooth_Muscle", "Myeloid", "NK/T-Cells", "B-Cells", "Neurons", "Lymphatic", "Mast", "Adipocytes"))
+
+no.sum <- colSums(prop.no)/16
+no.sum <- as.data.frame(no.sum)
+no.sum$celltype <- rownames(no.sum)
+colnames(no.sum) <- c("proportion", "celltype")
+no.sum$celltype <- factor(no.sum$celltype,
+                          levels = c("Cardiomyocytes", "Endothelium", "Fibroblasts", "Pericytes", "Smooth_Muscle", "Myeloid", "NK/T-Cells", "B-Cells", "Neurons", "Lymphatic", "Mast", "Adipocytes"))
+
+
+cmc.sum$ymax <- cumsum(cmc.sum$proportion)
+cmc.sum$ymin = c(0, head(cmc.sum$ymax, n=-1))
+
+ggplot(cmc.sum, aes(ymax = ymax, ymin= ymin, xmax = 4, xmin =3, fill = celltype)) + 
+  geom_rect() + 
+  #geom_label(x = 3.5, aes(y = labelPosition, label = proportion), size = 6) +
+  coord_polar("y") +
+  theme_void() +
+  scale_fill_manual(values = kropski_colour) + 
+  xlim(c(2,4))
+
+ves.sum$ymax <- cumsum(ves.sum$proportion)
+ves.sum$ymin = c(0, head(ves.sum$ymax, n=-1))
+
+ggplot(ves.sum, aes(ymax = ymax, ymin= ymin, xmax = 4, xmin =3, fill = celltype)) + 
+  geom_rect() + 
+  coord_polar("y") +
+  theme_void() +
+  scale_fill_manual(values = kropski_colour) + 
+  xlim(c(2,4))
+
+fb.sum$ymax <- cumsum(fb.sum$proportion)
+fb.sum$ymin = c(0, head(fb.sum$ymax, n=-1))
+
+ggplot(fb.sum, aes(ymax = ymax, ymin= ymin, xmax = 4, xmin =3, fill = celltype)) + 
+  geom_rect() + 
+  coord_polar("y") +
+  theme_void() +
+  scale_fill_manual(values = kropski_colour) + 
+  xlim(c(2,4))
+
+no.sum$ymax <- cumsum(no.sum$proportion)
+no.sum$ymin = c(0, head(no.sum$ymax, n=-1))
+
+ggplot(no.sum, aes(ymax = ymax, ymin= ymin, xmax = 4, xmin =3, fill = celltype)) + 
+  geom_rect() + 
+  coord_polar("y") +
+  theme_void() +
+  scale_fill_manual(values = kropski_colour) + 
+  xlim(c(2,4))
+```
+
+```{r}
+file1 <- read.csv("~/JH/HF/Marker/supple_cmc_marker.csv")
+file2 <- read.csv("~/JH/HF/Marker/supple_endo_marker.csv")
+file3 <- read.csv("~/JH/HF/Marker/supple_fibro_marker.csv")
+
+colnames(file1) <- file1[1,]
+colnames(file2) <- file2[1,]
+colnames(file3) <- file3[1,]
+
+file1 <- file1[-1,]
+file2 <- file2[-1,]
+file3 <- file3[-1,]
+
+file1$logFC <- as.numeric(file1$logFC)
+file1$adj.P.Val <- as.numeric(file1$adj.P.Val)
+file2$logFC <- as.numeric(file2$logFC)
+file2$adj.P.Val <- as.numeric(file2$adj.P.Val)
+file3$logFC <- as.numeric(file3$logFC)
+file3$adj.P.Val <- as.numeric(file3$adj.P.Val)
+
+file1.sort <- select_top_bottom(file1, 10)
+file2.sort <- select_top_bottom(file2, 10)
+file3.sort <- select_top_bottom(file3, 10)
+
+topbuttom_gene <- unique(c(file1.sort[,1], file2.sort[,1], file3.sort[,1]))
+```
+
+```{r}
+ pw_LEgenes <- logcounts[topbuttom_gene,]
+    
+
+    scaled_pw_LEgenes = t(scale(t(pw_LEgenes)))
+                                                                              
+
+    m <- m %>% mutate(Clinical_phenotype_LV2 = ifelse(Clinical_phenotype_LV=="ES_HCMP", "HCMPrEF", ifelse(Clinical_phenotype_LV=="NES_HCMP", "HCMPpEF", Clinical_phenotype_LV))) 
+    ## Annotation
+    ha = HeatmapAnnotation(
+    Celltype = m$celltype,
+    col = list(Celltype = c("CMC" = "#FD8A8A", "EC" = "#9EA1D4", "FB" = "#E9C874", "No_Seg" = "#A8D1D1"))
+    , annotation_name_side = "left"
+        , annotation_legend_param = list(
+        Celltype = list(nrow=1, direction = "horizontal")
+        , labels_gp=gpar(fontsize =14, fontface = "plain", fontfamily="sans"))
+    )
+    
+    
+    htmap <-Heatmap(scaled_pw_LEgenes, name="lcpm", top_annotation = ha
+                        ,column_dend_height = unit(1, "cm")
+            , show_column_names = FALSE
+            , row_names_gp = gpar(fontsize = 13)
+            , column_title_side = "bottom"
+            , cluster_columns = agnes(t(scaled_pw_LEgenes), metric = "manhattan", method = "average")
+            , heatmap_legend_param = list(nrow=1, direction = "horizontal", labels_gp=gpar(fontsize = 14, fontface = "plain" , fontfamily="sans"))
+
+            # , clustering_distance_columns = robust_dist
+            # , clustering_distance_rows = robust_dist
+           )
+        draw(htmap, heatmap_legend_side = "bottom", annotation_legend_side = "bottom")
+```
+
+```{r}
+library(org.Hs.eg.db)
+library(clusterProfiler)
+library(edgeR) # fail
+library(msigdbr)
+library(fgsea)
+library(tibble)
+library(tidyverse)
+library(data.table)
+```
+
+```{r}
+cmc_other <- read.csv("~/JH/HF/Marker/supple_cmc_marker.csv")
+endo_other <- read.csv("~/JH/HF/Marker/supple_endo_marker.csv")
+fibro_other <- read.csv("~/JH/HF/Marker/supple_fibro_marker.csv")
+colnames(cmc_other) <- cmc_other[1,]
+cmc_other <- cmc_other[-1,]
+cmc_other$logFC <- as.numeric(cmc_other$logFC)
+cmc_other$adj.P.Val <- as.numeric(cmc_other$adj.P.Val)
+colnames(endo_other) <- endo_other[1,]
+endo_other <- endo_other[-1,]
+endo_other$logFC <- as.numeric(endo_other$logFC)
+endo_other$adj.P.Val <- as.numeric(endo_other$adj.P.Val)
+colnames(fibro_other) <- fibro_other[1,]
+fibro_other <- fibro_other[-1,]
+fibro_other$logFC <- as.numeric(fibro_other$logFC)
+fibro_other$adj.P.Val <- as.numeric(fibro_other$adj.P.Val)
+
+res <- endo_other[order(-endo_other$logFC),]
+res <- res %>% filter(adj.P.Val <= 0.05)
+res <- na.omit(res)
+gene_list <- res$logFC
+names(gene_list) <- res$SYMBOL
+
+gse <- gseGO(gene_list,
+             ont = "BP", #CC,ALL 가능
+             keyType = "SYMBOL", #ENSEMBL 은 데이터베이스에서 사용되는 유전자 식별자. 막 ENSG0000 어쩌구 이런거
+             OrgDb = "org.Hs.eg.db",
+             pvalueCutoff = 1)
+
+```
+
+```{r}
+library(ggstance)
+library(enrichplot)
+library(forcats)
+
+gsea <- as.data.frame(gse)
+gsea_cmc <- gsea
+#gsea_endo <- gsea
+#gsea_fibro <- gsea
+```
+
+```{r}
+gobp_top5 <- c("aerobic respiration", "cellular respiration", "oxidative phosphorylation", "ATP metabolic process", "energy derivation by oxidation of organic compounds", "endothelium development", "angiogenesis", "blood vessel development", "blood vessel morphogenesis", "vasculature development", "extracellular matrix organization", "extracellular structure organization", "external encapsulating structure organization", "collagen fibril organization", "connective tissue development")
+
+gobp_top5_cmc <- gsea_cmc[gsea_cmc$Description %in% gobp_top5,]
+gobp_top5_cmc$Description <- factor(gobp_top5_cmc$Description,
+                                    levels = c("aerobic respiration", "cellular respiration", "oxidative phosphorylation", "ATP metabolic process", "energy derivation by oxidation of organic compounds", "endothelium development", "angiogenesis", "blood vessel development", "blood vessel morphogenesis", "vasculature development", "extracellular matrix organization", "extracellular structure organization", "external encapsulating structure organization", "collagen fibril organization", "connective tissue development"))
+gobp_top5_cmc <- gobp_top5_cmc[order(gobp_top5_cmc$Description),]
+gobp_top5_cmc$celltype <- "Cardiomyocyte"
+gobp_top5_endo <- gsea_endo[gsea_endo$Description %in% gobp_top5,]
+gobp_top5_endo$Description <- factor(gobp_top5_endo$Description,
+                                     levels = gobp_top5)
+gobp_top5_endo <- gobp_top5_endo[order(gobp_top5_endo$Description),]
+gobp_top5_endo$celltype <- "Endothelial cell"
+gobp_top5_fibro <- gsea_fibro[gsea_fibro$Description %in% gobp_top5,]
+gobp_top5_fibro$Description <- factor(gobp_top5_fibro$Description,
+                                     levels = gobp_top5)
+gobp_top5_fibro <- gobp_top5_fibro[order(gobp_top5_fibro$Description),]
+gobp_top5_fibro$celltype <- "Fibroblast"
+
+gobp_top5_cmc_sort <- gobp_top5_cmc[,c("Description", "NES", "p.adjust", "celltype")]
+gobp_top5_endo_sort <- gobp_top5_endo[,c("Description", "NES", "p.adjust", "celltype")]
+gobp_top5_fibro_sort <- gobp_top5_fibro[,c("Description", "NES", "p.adjust", "celltype")]
+
+gobp_top5_sort <- rbind(gobp_top5_cmc_sort, gobp_top5_endo_sort, gobp_top5_fibro_sort)
+
+```
+
+```{r}
+my_dotcolor <- RColorBrewer:: brewer.pal(11, "RdBu")
+```
+
+# figure 2g
+
+```{r}
+gobp_top5_sort <- gobp_top5_sort %>% mutate(pvalue=ifelse(p.adjust > 0.05, "white", "black"))
+
+ggplot(gobp_top5_sort, aes(x = celltype, y = Description, fill = NES, color = pvalue)) +
+  geom_point(aes(size = -log10(p.adjust)), alpha = 1, shape = 21, stroke = 1) +
+  scale_size_continuous(range = c(0.05,7)) +
+  theme_bw() +
+  #theme(axis.line = element_line(colour = "black", size = 0.8)) +
+  theme(panel.grid = element_blank()) +
+  #ylab("Proportion of Cells") +
+  xlab("") +
+  #theme(text = element_text(size=11)) +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1)) +
+  scale_y_discrete(limits = rev(levels(gobp_top5_sort$Description))) +
+  #scale_y_continuous(expand = expansion(mult = c(0, 0))) +
+  #guides(fill = guide_legend(ncol = 1)) +
+  #theme(legend.key.height = unit(10, units = 'pt')) +
+  scale_fill_gradientn(colors = rev(my_dotcolor), 
+                       limits = c(min(gobp_top5_sort$NES, na.rm = TRUE), max(gobp_top5_sort$NES, na.rm = TRUE)), oob = scales::squish)+
+  scale_color_manual(values = c("black", "white"))  
+```
+
+# Figure 2h
+```{r}
+roi_marker <- c("TNNI3", "MYL3", "MYL2", "MB", "CKM", "VWF", "ID1", "PECAM1", "SLC9A3R2", "HBA2", "COL3A1", "MGP", "COL1A2", "LUM", "THBS4")
+
+logcounts_marker <- logcounts[roi_marker, finalROI_order]
+
+logcounts_trp <- logcounts_marker[,grepl("Trp", colnames(logcounts_marker))]
+logcounts_ves <- logcounts_marker[,grepl("vessel", colnames(logcounts_marker))]
+logcounts_fib <- logcounts_marker[,grepl("fb", colnames(logcounts_marker))]
+logcounts_no <- logcounts_marker[,grepl("ROI", colnames(logcounts_marker))]
+
+mean.trp <- rowMeans(logcounts_trp, na.rm = T)
+mean.ves <- rowMeans(logcounts_ves, na.rm = T)
+mean.fb <- rowMeans(logcounts_fib, na.rm = T)
+mean.no <- rowMeans(logcounts_no, na.rm = T)
+
+logcounts_trp <- cbind(logcounts_trp, mean.trp)
+logcounts_trp <- as.data.frame(logcounts_trp)
+logcounts_trp$gene <- roi_marker
+logcounts_trp$region <- "cardiomyocyte_ROI"
+logcounts_mean_trp <- logcounts_trp[,84:86]
+
+logcounts_ves <- cbind(logcounts_ves, mean.ves)
+logcounts_ves <- as.data.frame(logcounts_ves)
+logcounts_ves$gene <- roi_marker
+logcounts_ves$region <- "endothelial_ROI"
+logcounts_mean_ves <- logcounts_ves[,46:48]
+
+logcounts_fib <- cbind(logcounts_fib, mean.fb)
+logcounts_fib <- as.data.frame(logcounts_fib)
+logcounts_fib$gene <- roi_marker
+logcounts_fib$region <- "fibroblast_ROI"
+logcounts_mean_fib <- logcounts_fib[,14:16]
+
+logcounts_no <- cbind(logcounts_no, mean.no)
+logcounts_no <- as.data.frame(logcounts_no)
+logcounts_no$gene <- roi_marker
+logcounts_no$region <- "nosegment_ROI"
+logcounts_mean_no <- logcounts_no[,17:19]
+
+colnames(logcounts_mean_trp) <- c("value", "gene", "region")
+colnames(logcounts_mean_ves) <- c("value", "gene", "region")
+colnames(logcounts_mean_fib) <- c("value", "gene", "region")
+colnames(logcounts_mean_no) <- c("value", "gene", "region")
+
+```
+
+```{r}
+logcounts_merge_row <- cbind(logcounts_mean_trp, logcounts_mean_ves, logcounts_mean_fib, logcounts_mean_no)
+logcounts_merge_row <- logcounts_merge_row[,c(1,4,7,10)]
+logcounts_merge_row <- rowscale(logcounts_merge_row)
+logcounts_mean_trp2 <- cbind(logcounts_merge_row[,1], logcounts_mean_trp[,2:3])
+logcounts_mean_ves2 <- cbind(logcounts_merge_row[,2], logcounts_mean_ves[,2:3])
+logcounts_mean_fib2 <- cbind(logcounts_merge_row[,3], logcounts_mean_fib[,2:3])
+logcounts_mean_no2 <- cbind(logcounts_merge_row[,4], logcounts_mean_no[,2:3])
+colnames(logcounts_mean_trp2) <- c("value", "gene", "region")
+colnames(logcounts_mean_ves2) <- c("value", "gene", "region")
+colnames(logcounts_mean_fib2) <- c("value", "gene", "region")
+colnames(logcounts_mean_no2) <- c("value", "gene", "region")
+
+logcounts_merge2 <- rbind(logcounts_mean_trp2, logcounts_mean_ves2, logcounts_mean_fib2, logcounts_mean_no2)
+logcounts_merge2$gene <- factor(logcounts_merge2$gene,
+                               levels = roi_marker)
+
+my_palette <- colorRampPalette(c("#FFF3E2", "#FFE5CA", "#C70039", '#900C3F'))(8)
+
+ggplot(logcounts_merge2, aes(x = gene, y = region, fill = value)) +
+  geom_point(aes(size = 10), alpha = 1, shape = 21) +
+  #scale_size_continuous(range = c(0.05,5)) +
+  theme_bw() +
+  theme(panel.border = element_blank()) +
+  theme(axis.line = element_line(colour = "black", size = 0.8)) +
+  theme(panel.grid = element_blank()) +
+  ylab("") +
+  xlab("") +
+  theme(text = element_text(size=11)) +
+  theme(axis.text.x = element_text(angle = 90, hjust = 1, vjust = 0.5)) +
+  #scale_fill_viridis_c(option = "cividis") +
+  scale_fill_gradientn(colors = brewer.pal(n = 11, name = "RdBu")[11:1], limits = c(min(logcounts_merge2$value), max(logcounts_merge2$value))) +
+  #scale_fill_gradientn(colors = my_palette, limits = c(min(logcounts_merge2$value), max(logcounts_merge2$value))) +
+  scale_y_discrete(limits = rev)
+
+```
+
+# Figure 2i
+
+```{r}
+
+logcounts_trp <- logcounts[,grepl("Trp", colnames(logcounts))]
+logcounts_ves <- logcounts[,grepl("vessel", colnames(logcounts))]
+logcounts_fib <- logcounts[,grepl("fb", colnames(logcounts))]
+logcounts_no <- logcounts[,grepl("ROI", colnames(logcounts))]
+
+mean.trp <- rowMeans(logcounts_trp, na.rm = T)
+mean.ves <- rowMeans(logcounts_ves, na.rm = T)
+mean.fb <- rowMeans(logcounts_fib, na.rm = T)
+mean.no <- rowMeans(logcounts_no, na.rm = T)
+
+row.trp.sd <- apply(logcounts_trp, 1, sd)
+row.ves.sd <- apply(logcounts_ves, 1, sd)
+row.fb.sd <- apply(logcounts_fib, 1, sd)
+row.no.sd <- apply(logcounts_no, 1, sd)
+
+```
+
+# zscore
+
+```{r}
+logcounts_trp <- cbind(logcounts_trp, mean.trp, row.trp.sd)
+logcounts_trp <- as.data.frame(logcounts_trp)
+logcounts_trp$gene <- rownames(logcounts_trp)
+logcounts_trp$region <- "cardiomyocyte_ROI"
+logcounts_mean_trp <- logcounts_trp[,84:87]
+
+logcounts_ves <- cbind(logcounts_ves, mean.ves, row.ves.sd)
+logcounts_ves <- as.data.frame(logcounts_ves)
+logcounts_ves$gene <- rownames(logcounts_ves)
+logcounts_ves$region <- "endothelial_ROI"
+logcounts_mean_ves <- logcounts_ves[,46:49]
+
+logcounts_fib <- cbind(logcounts_fib, mean.fb, row.fb.sd)
+logcounts_fib <- as.data.frame(logcounts_fib)
+logcounts_fib$gene <- rownames(logcounts_fib)
+logcounts_fib$region <- "fibroblast_ROI"
+logcounts_mean_fib <- logcounts_fib[,14:17]
+
+logcounts_no <- cbind(logcounts_no, mean.no, row.no.sd)
+logcounts_no <- as.data.frame(logcounts_no)
+logcounts_no$gene <- rownames(logcounts_no)
+logcounts_no$region <- "nosegment_ROI"
+logcounts_mean_no <- logcounts_no[,17:20]
+
+colnames(logcounts_mean_trp) <- c("mean", "sd", "gene", "region")
+colnames(logcounts_mean_ves) <- c("mean", "sd", "gene", "region")
+colnames(logcounts_mean_fib) <- c("mean", "sd", "gene", "region")
+colnames(logcounts_mean_no) <- c("mean", "sd", "gene", "region")
+
+trp_values <- t(logcounts_trp)
+ves_values <- t(logcounts_ves)
+fb_values <- t(logcounts_fib)
+no_values <- t(logcounts_no)
+
+calculate_z_scores <- function(mean, sd, values) {
+  (values - mean) / sd
+}
+
+z_scores <- data.frame(matrix(ncol = ncol(trp_values), nrow = nrow(trp_values)))
+rownames(z_scores) <- rownames(trp_values)
+colnames(z_scores) <- colnames(trp_values)
+
+for (gene in rownames(logcounts_mean_trp)) {
+  gene_mean <- logcounts_mean_trp[gene, "mean"]
+  gene_sd <- logcounts_mean_trp[gene, "sd"]
+  values <- trp_values[, gene]
+  z_scores[gene] <- calculate_z_scores(gene_mean, gene_sd, values)
+}
+```
+
+```{r}
+## mean 의 zscore를 구하기
+mean_merge <- cbind(logcounts_mean_trp[,c(1,3)], logcounts_mean_ves[,1], logcounts_mean_fib[,1], logcounts_mean_no[,1])
+rownames(mean_merge) <- mean_merge$gene
+mean_merge <- mean_merge[,c(1,3:5)]
+colnames(mean_merge) <- c("CMC", "EC", "FB", "NO")
+
+mean_merge_t <- t(mean_merge)
+
+mean_merge_mean <- rowMeans(mean_merge, na.rm = T)
+
+row_merge_sd <- apply(mean_merge, 1, sd)
+
+mean_merge <- cbind(mean_merge, mean_merge_mean, row_merge_sd)
+
+colnames(mean_merge) <- c("CMC", "EC", "FB", "NO", "mean", "sd")
+
+z_scores_merge <- data.frame(matrix(ncol = ncol(mean_merge_t), nrow = nrow(mean_merge_t)))
+rownames(z_scores_merge) <- rownames(mean_merge_t)
+colnames(z_scores_merge) <- colnames(mean_merge_t)
+
+for (gene in rownames(mean_merge)) {
+  gene_mean <- mean_merge[gene, "mean"]
+  gene_sd <- mean_merge[gene, "sd"]
+  values <- mean_merge_t[, gene]
+  z_scores_merge[gene] <- calculate_z_scores(gene_mean, gene_sd, values)
+}
+
+z_scores_merge <- t(z_scores_merge)
+
+z_scores_roi <- z_scores_merge[roi_marker,]
+
+library(ComplexHeatmap)
+Heatmap(z_scores_roi, cluster_rows = F, cluster_columns = F)
+```
+

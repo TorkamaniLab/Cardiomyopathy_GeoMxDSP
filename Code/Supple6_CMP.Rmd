@@ -1,0 +1,307 @@
+---
+title: "Supple6_CMP"
+output: html_document
+date: "2024-05-29"
+---
+
+```{r}
+library(RColorBrewer)
+library(viridisLite)
+library(viridis)
+library(Seurat)
+library(ggplot2)
+library(dplyr)
+library(patchwork)
+require(data.table)
+library(dittoSeq)
+library(tidyr)
+library(SeuratWrappers, lib.loc = "/home/jsy/R/x86_64-pc-linux-gnu-library/4.1")
+library(PCFAM)
+library(factoextra)
+library(ggrepel)
+library(tidyverse)
+library(NanoStringNCTools)
+library(GeomxTools)
+library(Biobase)
+library(reshape2)
+library(standR)
+library(SpatialExperiment)
+library(limma)
+library(ExperimentHub)
+library(DESeq2)
+library(edgeR)
+library(DEFormats)
+library(SpatialDecon)
+library(SeuratObject)
+library(ggpubr)
+library(readxl)
+library(cowplot)
+library(RUVSeq)
+library(reshape2)
+library(outliers)
+library(preprocessCore)
+library(fitdistrplus)
+library(EnvStats)
+library(ggiraph)
+library(GeoMxWorkflows)
+library(cowplot)
+library(umap)
+library(Rtsne)
+library(pheatmap)  # for pheatmap
+library(variancePartition)
+library(BiocParallel)
+```
+
+# using spatial deconvolution data
+
+```{r}
+### Clinical phenotype ----
+proprtion_meta <- poa
+proprtion_meta <- cbind(proprtion_meta, m[,colnames(m) == "Clinical_phenotype_LV"])
+prop.no.cli <- proprtion_meta[proprtion_meta$Region == "No_segmentation",]
+prop.no.cli <- prop.no.cli[, c(1:12, 14)]
+prop.no.cli.con <- prop.no.cli[prop.no.cli$`m[, colnames(m) == "Clinical_phenotype_LV"]` == "Control",]
+prop.no.cli.icmp <- prop.no.cli[prop.no.cli$`m[, colnames(m) == "Clinical_phenotype_LV"]` == "ICMP",]
+prop.no.cli.dcmp <- prop.no.cli[prop.no.cli$`m[, colnames(m) == "Clinical_phenotype_LV"]` == "DCMP",]
+prop.no.cli.nhcmp <- prop.no.cli[prop.no.cli$`m[, colnames(m) == "Clinical_phenotype_LV"]` == "NES_HCMP",]
+prop.no.cli.ehcmp <- prop.no.cli[prop.no.cli$`m[, colnames(m) == "Clinical_phenotype_LV"]` == "ES_HCMP",]
+
+prop.no.cli.con <- prop.no.cli.con[,1:12]
+prop.no.cli.con <- colSums(prop.no.cli.con)/2
+prop.no.cli.con <- as.data.frame(prop.no.cli.con)
+prop.no.cli.con$celltype <- rownames(prop.no.cli.con)
+colnames(prop.no.cli.con) <- c("proportion", "celltype")
+prop.no.cli.con$celltype <- factor(prop.no.cli.con$celltype,
+                                   levels = c("Cardiomyocytes", "Endothelium", "Fibroblasts", "Pericytes", "Smooth_Muscle", "Myeloid", "NK/T-Cells", "B-Cells", "Neurons", "Lymphatic", "Mast", "Adipocytes"))
+
+prop.no.cli.con$ymax <- cumsum(prop.no.cli.con$proportion)
+prop.no.cli.con$ymin = c(0, head(prop.no.cli.con$ymax, n=-1))
+
+ggplot(prop.no.cli.con, aes(ymax = ymax, ymin= ymin, xmax = 4, xmin =3, fill = celltype)) + 
+  geom_rect() + 
+  coord_polar("y") +
+  theme_void() +
+  scale_fill_manual(values = kropski_colour) + 
+  xlim(c(2,4))
+
+prop.no.cli.icmp <- prop.no.cli.icmp[,1:12]
+prop.no.cli.icmp <- colSums(prop.no.cli.icmp)/2
+prop.no.cli.icmp <- as.data.frame(prop.no.cli.icmp)
+prop.no.cli.icmp$celltype <- rownames(prop.no.cli.icmp)
+colnames(prop.no.cli.icmp) <- c("proportion", "celltype")
+prop.no.cli.icmp$celltype <- factor(prop.no.cli.icmp$celltype,
+                                    levels = c("Cardiomyocytes", "Endothelium", "Fibroblasts", "Pericytes", "Smooth_Muscle", "Myeloid", "NK/T-Cells", "B-Cells", "Neurons", "Lymphatic", "Mast", "Adipocytes"))
+
+prop.no.cli.icmp$ymax <- cumsum(prop.no.cli.icmp$proportion)
+prop.no.cli.icmp$ymin = c(0, head(prop.no.cli.icmp$ymax, n=-1))
+
+ggplot(prop.no.cli.icmp, aes(ymax = ymax, ymin= ymin, xmax = 4, xmin =3, fill = celltype)) + 
+  geom_rect() + 
+  coord_polar("y") +
+  theme_void() +
+  scale_fill_manual(values = kropski_colour) + 
+  xlim(c(2,4))
+
+prop.no.cli.dcmp <- prop.no.cli.dcmp[,1:12]
+prop.no.cli.dcmp <- colSums(prop.no.cli.dcmp)/6
+prop.no.cli.dcmp <- as.data.frame(prop.no.cli.dcmp)
+prop.no.cli.dcmp$celltype <- rownames(prop.no.cli.dcmp)
+colnames(prop.no.cli.dcmp) <- c("proportion", "celltype")
+prop.no.cli.dcmp$celltype <- factor(prop.no.cli.dcmp$celltype,
+                                    levels = c("Cardiomyocytes", "Endothelium", "Fibroblasts", "Pericytes", "Smooth_Muscle", "Myeloid", "NK/T-Cells", "B-Cells", "Neurons", "Lymphatic", "Mast", "Adipocytes"))
+
+prop.no.cli.dcmp$ymax <- cumsum(prop.no.cli.dcmp$proportion)
+prop.no.cli.dcmp$ymin = c(0, head(prop.no.cli.dcmp$ymax, n=-1))
+
+ggplot(prop.no.cli.dcmp, aes(ymax = ymax, ymin= ymin, xmax = 4, xmin =3, fill = celltype)) + 
+  geom_rect() + 
+  coord_polar("y") +
+  theme_void() +
+  scale_fill_manual(values = kropski_colour) + 
+  xlim(c(2,4))
+
+
+prop.no.cli.nhcmp <- prop.no.cli.nhcmp[,1:12]
+prop.no.cli.nhcmp <- colSums(prop.no.cli.nhcmp)
+prop.no.cli.nhcmp <- as.data.frame(prop.no.cli.nhcmp)
+prop.no.cli.nhcmp$celltype <- rownames(prop.no.cli.nhcmp)
+colnames(prop.no.cli.nhcmp) <- c("proportion", "celltype")
+prop.no.cli.nhcmp$celltype <- factor(prop.no.cli.nhcmp$celltype,
+                                     levels = c("Cardiomyocytes", "Endothelium", "Fibroblasts", "Pericytes", "Smooth_Muscle", "Myeloid", "NK/T-Cells", "B-Cells", "Neurons", "Lymphatic", "Mast", "Adipocytes"))
+
+prop.no.cli.nhcmp$ymax <- cumsum(prop.no.cli.nhcmp$proportion)
+prop.no.cli.nhcmp$ymin = c(0, head(prop.no.cli.nhcmp$ymax, n=-1))
+
+ggplot(prop.no.cli.nhcmp, aes(ymax = ymax, ymin= ymin, xmax = 4, xmin =3, fill = celltype)) + 
+  geom_rect() + 
+  coord_polar("y") +
+  theme_void() +
+  scale_fill_manual(values = kropski_colour) + 
+  xlim(c(2,4))
+
+prop.no.cli.ehcmp <- prop.no.cli.ehcmp[,1:12]
+prop.no.cli.ehcmp <- colSums(prop.no.cli.ehcmp)/5
+prop.no.cli.ehcmp <- as.data.frame(prop.no.cli.ehcmp)
+prop.no.cli.ehcmp$celltype <- rownames(prop.no.cli.ehcmp)
+colnames(prop.no.cli.ehcmp) <- c("proportion", "celltype")
+prop.no.cli.ehcmp$celltype <- factor(prop.no.cli.ehcmp$celltype,
+                                     levels = c("Cardiomyocytes", "Endothelium", "Fibroblasts", "Pericytes", "Smooth_Muscle", "Myeloid", "NK/T-Cells", "B-Cells", "Neurons", "Lymphatic", "Mast", "Adipocytes"))
+
+prop.no.cli.ehcmp$ymax <- cumsum(prop.no.cli.ehcmp$proportion)
+prop.no.cli.ehcmp$ymin = c(0, head(prop.no.cli.ehcmp$ymax, n=-1))
+
+ggplot(prop.no.cli.ehcmp, aes(ymax = ymax, ymin= ymin, xmax = 4, xmin =3, fill = celltype)) +
+  geom_rect() + 
+  coord_polar("y") +
+  theme_void() +
+  scale_fill_manual(values = kropski_colour) + 
+  xlim(c(2,4))
+
+prop.no.cli.con$clinic <- "Control"
+prop.no.cli.icmp$clinic <- "ICMP"
+prop.no.cli.dcmp$clinic <- "DCMP"
+prop.no.cli.ehcmp$clinic <- "HCMPrEF"
+prop.no.cli.nhcmp$clinic <- "HCMPpEF"
+
+no.cli.con <- prop.no.cli.con[,c("clinic", "celltype", "proportion")]
+no.cli.icmp <- prop.no.cli.icmp[,c("clinic", "celltype", "proportion")]
+no.cli.dcmp <- prop.no.cli.dcmp[,c("clinic", "celltype", "proportion")]
+no.cli.ehcmp <- prop.no.cli.ehcmp[,c("clinic", "celltype", "proportion")]
+no.cli.nhcmp <- prop.no.cli.nhcmp[,c("clinic", "celltype", "proportion")]
+
+prop.no.cli.merge <- rbind(no.cli.con, no.cli.dcmp, no.cli.icmp, no.cli.ehcmp, no.cli.nhcmp)
+
+```
+
+# Statistical analysis
+```{r}
+prop.no.cli.con.t <- t(prop.no.cli.con)
+prop.no.cli.con.t <- melt(prop.no.cli.con.t)
+prop.no.cli.con.t$condition <- "control"
+prop.no.cli.dcmp.t <- t(prop.no.cli.dcmp)
+prop.no.cli.dcmp.t <- melt(prop.no.cli.dcmp.t)
+prop.no.cli.dcmp.t$condition <- "DCMP"
+prop.no.cli.icmp.t <- t(prop.no.cli.icmp)
+prop.no.cli.icmp.t <- melt(prop.no.cli.icmp.t)
+prop.no.cli.icmp.t$condition <- "ICMP"
+prop.no.cli.ehcmp.t <- t(prop.no.cli.ehcmp)
+prop.no.cli.ehcmp.t <- melt(prop.no.cli.ehcmp.t)
+prop.no.cli.ehcmp.t$condition <- "HCMPrEF"
+prop.no.cli.nhcmp.t <- t(prop.no.cli.nhcmp)
+prop.no.cli.nhcmp.t <- melt(prop.no.cli.nhcmp.t)
+prop.no.cli.nhcmp.t$condition <- "HCMPpEF"
+
+
+colnames(prop.no.cli.con.t) <- c("celltype", "identity", "value", "grade")
+colnames(prop.no.cli.dcmp.t) <- c("celltype", "identity", "value", "grade")
+colnames(prop.no.cli.icmp.t) <- c("celltype", "identity", "value", "grade")
+colnames(prop.no.cli.ehcmp.t) <- c("celltype", "identity", "value", "grade")
+colnames(prop.no.cli.nhcmp.t) <- c("celltype", "identity", "value", "grade")
+
+prop.clinic.merge <- rbind(prop.no.cli.con.t, prop.no.cli.dcmp.t, prop.no.cli.icmp.t, prop.no.cli.ehcmp.t, prop.no.cli.nhcmp.t)
+prop.clinic.merge.cmc <- prop.clinic.merge[prop.clinic.merge$celltype == "Cardiomyocytes",]
+prop.clinic.merge.fb <- prop.clinic.merge[prop.clinic.merge$celltype == "Fibroblasts",]
+prop.clinic.merge.ves <- prop.clinic.merge[prop.clinic.merge$celltype == "Endothelium",]
+krusk_rest <- kruskal.test(value ~ grade, data = prop.clinic.merge.fb)
+krusk_rest
+
+
+summary_stats <- prop.clinic.merge.ves %>%
+  filter(grade == "HCMPpEF") %>%
+  summarize(variance_proportion = var(value), sd_proportion = sd(value))
+
+summary_stats
+```
+
+# histological proportion
+```{r}
+proprtion_meta <- proportion
+proprtion_meta <- cbind(proprtion_meta, m[,colnames(m) == "P_Degeneration"]) # P_Degeneration, #P_Hypertrophy, #P_Disarray, #P_Fibrosis
+proprtion_meta$degen <- factor(proprtion_meta$`m[, colnames(m) == "P_Degeneration"]`,
+                               levels = c("0", "1", "2", "3"),
+                               labels = c("none", "mild", "severe", "severe"))
+
+severe_list <- list()
+severe_list[[3]] <- "severe"
+degen_list <- list()
+degen_prop_list <- list()
+pie_degen_list <- list()
+
+for(i in 1:length(severe_list)){
+ prop.no.histo <- proprtion_meta[proprtion_meta$Region == "No_segmentation",]
+ prop.no.histo <- prop.no.histo[, c(1:12, 15)]
+ degen_list[[i]] <- prop.no.histo[prop.no.histo$degen == severe_list[[i]],]
+ 
+ degen_list[[i]] <- degen_list[[i]][,1:12]
+ 
+ degen_prop_list[[i]] <- colSums(degen_list[[i]])/nrow(degen_list[[i]])
+ 
+ degen_prop_list[[i]] <- as.data.frame(degen_prop_list[[i]])
+ degen_prop_list[[i]]$celltype <- rownames(degen_prop_list[[i]])
+ colnames(degen_prop_list[[i]]) <- c("proportion", "celltype")
+ degen_prop_list[[i]]$celltype <- factor(degen_prop_list[[i]]$celltype,
+                                      levels = c("Cardiomyocytes", "Endothelium", "Fibroblasts", "Pericytes", "Smooth_Muscle", "Myeloid", "NK/T-Cells", "B-Cells", "Neurons", "Lymphatic", "Mast", "Adipocytes"))
+ 
+ degen_prop_list[[i]]$ymax <- cumsum(degen_prop_list[[i]]$proportion)
+ degen_prop_list[[i]]$ymin = c(0, head(degen_prop_list[[i]]$ymax, n=-1))
+ 
+ pie_degen_list[[i]] <- ggplot(degen_prop_list[[i]], aes(ymax = ymax, ymin= ymin, xmax = 4, xmin =3, fill = celltype)) +
+   geom_rect() + 
+   coord_polar("y") +
+   theme_void() +
+   scale_fill_manual(values = kropski_colour) + 
+   xlim(c(2,4))
+ 
+}
+```
+
+# Statistical analysis
+```{r}
+degen.normal <- degen_list[[1]]
+degen.mild <- degen_list[[2]]
+degen.severe <- degen_list[[3]]
+degen.normal <- t(degen.normal)
+degen.normal <- melt(degen.normal)
+degen.normal$grade <- "normal"
+degen.mild <- t(degen.mild)
+degen.mild <- melt(degen.mild)
+degen.mild$grade <- "mild"
+degen.severe <- t(degen.severe)
+degen.severe <- melt(degen.severe)
+degen.severe$grade <- "severe"
+colnames(degen.normal) <- c("celltype", "identity", "value", "grade")
+colnames(degen.mild) <- c("celltype", "identity", "value", "grade")
+colnames(degen.severe) <- c("celltype", "identity", "value", "grade")
+
+
+degen_prop_list[[1]]$grade <- "normal"
+degen_prop_list[[2]]$grade <- "mild"
+degen_prop_list[[3]]$grade <- "severe"
+
+no.degen.normal <- degen_prop_list[[1]][,c("grade", "celltype", "proportion")]
+no.degen.mild <- degen_prop_list[[2]][,c("grade", "celltype", "proportion")]
+no.degen.severe <- degen_prop_list[[3]][,c("grade", "celltype", "proportion")] 
+
+prop.table.degen <- cbind(no.degen.normal[,3], no.degen.mild[,3], no.degen.severe[,3])
+prop.table.degen <- as.data.frame(prop.table.degen)
+rownames(prop.table.degen) <- c("Cardiomyocytes", "Endothelium", "Fibroblasts", "Pericytes", "Smooth_Muscle", "Myeloid", "NK/T-Cells", "B-Cells", "Neurons", "Lymphatic", "Mast", "Adipocytes")
+colnames(prop.table.degen) <- c("normal", "mild", "severe")
+fisher_result <- fisher.test(prop.table.degen)
+
+prop.no.degen.merge <- rbind(no.degen.normal, no.degen.mild, no.degen.severe)
+
+prop.degen.merge <- rbind(degen.normal, degen.mild, degen.severe)
+prop.degen.merge.cmc <- prop.degen.merge[prop.degen.merge$celltype == "Cardiomyocytes",]
+prop.degen.merge.fb <- prop.degen.merge[prop.degen.merge$celltype == "Fibroblasts",]
+prop.degen.merge.ves <- prop.degen.merge[prop.degen.merge$celltype == "Endothelium",]
+
+chisq_test <- chisq.test(table(prop.no.degen.merge$grade, prop.no.degen.merge$celltype))
+fisher_result <- fisher.test(table(prop.no.degen.merge$grade, prop.no.degen.merge$celltype))
+krusk_rest <- kruskal.test(value ~ grade, data = prop.degen.merge.cmc)
+krusk_rest
+
+summary_stats <- prop.degen.merge.fb %>%
+  filter(grade == "severe") %>%
+  summarize(variance_proportion = var(value), sd_proportion = sd(value))
+```
+

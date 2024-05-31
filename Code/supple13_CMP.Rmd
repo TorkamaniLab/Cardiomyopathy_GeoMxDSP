@@ -1,0 +1,427 @@
+---
+title: "Supple13_CMP"
+output: html_document
+date: "2024-05-30"
+---
+
+# selecting ROI
+```{r}
+hypertrophy_cmc <- read.csv("~/JH/HF/hypertrophy_cmc.csv", row.names = 1)
+hypertrophy_endo <- read.csv("~/JH/HF/hypertrophy_endo.csv", row.names = 1)
+fibrosis_cmc <- read.csv("~/JH/HF/fibrosis_cmc.csv", row.names = 1)
+fibrosis_endo <- read.csv("~/JH/HF/fibrosis_endo.csv", row.names = 1)
+degen_cmc <- read.csv("~/JH/HF/degen_cmc.csv", row.names = 1)
+degen_endo <- read.csv("~/JH/HF/degen_endo.csv", row.names = 1)
+disarray_cmc <- read.csv("~/JH/HF/disarray_cmc.csv", row.names = 1)
+disarray_endo <- read.csv("~/JH/HF/disarray_endo.csv", row.names = 1)
+
+```
+
+```{r}
+metadata <- m
+metadata$diagnosis <- metadata$Clinical_phenotype_LV
+metadata$diagnosis <- factor(metadata$diagnosis,
+                             levels = c("Control", "DCMP", "ICMP", "ES_HCMP", "NES_HCMP"),
+                             labels = c("Control", "DCMP", "ICMP", "HCMPrEF", "HCMPpEF"))
+metadata$clinicname <- paste0(metadata$diagnosis, "_", metadata$Name)
+metadata <- metadata %>% mutate(P_Deg_0vs1 = ifelse(P_Degeneration == 2 | P_Degeneration == 3, "Degneration", "Nodegen"))
+metadata <- metadata %>% mutate(P_Hyp_0vs1 = ifelse(P_Hypertrophy == 2 | P_Hypertrophy == 3, "Hypertrophy", "Nohyper"))
+metadata <- metadata %>% mutate(P_Fib_0vs1 = ifelse(P_Fibrosis == 2 | P_Fibrosis == 3, "Fibrosis", "Nofibro"))
+metadata <- metadata %>% mutate(P_Disarray_0vs1 = ifelse(P_Disarray == 1 | P_Disarray ==2, "Disarray", "Nodisarray"))
+metadata$degname <- paste0(metadata$P_Deg_0vs1, "_", metadata$Name)
+metadata$hypname <- paste0(metadata$P_Hyp_0vs1, "_", metadata$Name)
+metadata$fibname <- paste0(metadata$P_Fib_0vs1, "_", metadata$Name)
+metadata$disname <- paste0(metadata$P_Disarray_0vs1, "_", metadata$Name)
+metadata$histoname <- paste0(metadata$P_Deg_0vs1, "_", metadata$P_Hyp_0vs1, "_", metadata$P_Fib_0vs1, "_", metadata$P_Disarray_0vs1, "_",metadata$Name)
+
+
+metadata <- metadata %>% mutate(P_Deg_012 = ifelse(P_Degeneration == 2 | P_Degeneration == 3, 2, P_Degeneration))
+metadata <- metadata %>% mutate(P_Hyp_012 = ifelse(P_Hypertrophy == 2 | P_Hypertrophy == 3, 2, P_Hypertrophy))
+metadata <- metadata %>% mutate(P_Fib_012 = ifelse(P_Fibrosis == 2 | P_Fibrosis == 3, 2, P_Fibrosis))
+
+metadata <- metadata %>% mutate(P_Deg_0vs1 = ifelse(P_Degeneration == 2 | P_Degeneration == 3, 1, 0))
+metadata <- metadata %>% mutate(P_Hyp_0vs1 = ifelse(P_Hypertrophy == 2 | P_Hypertrophy == 3, 1, 0))
+metadata <- metadata %>% mutate(P_Fib_0vs1 = ifelse(P_Fibrosis == 2 | P_Fibrosis == 3, 1, 0))
+
+metadata <- metadata %>% mutate(ClinicalNHist_Control = ifelse(Clinical_phenotype_bi == "Control", "Control_Clin", 
+                                                     ifelse(P_Normal == "1" & Clinical_phenotype_bi == "Diseased", "Control_His", "Diseased"))
+)
+
+metadata <- metadata %>% mutate(ClinicalNHist_Control2 = ifelse(Clinical_phenotype_LV == "Control", "Control_Clin", 
+                                                      ifelse(P_Normal == "1" & Clinical_phenotype_LV != "Control", "Control_His", 
+                                                             ifelse(Clinical_phenotype_LV == "NES_HCMP", "Diseased_NES", "Diseased_ES")))
+)
+
+# 'P_Degeneration''P_Hypertrophy''P_Disarray''P_Fibrosis''P_peri_infarction''P_etc'
+# from 4 grouping to 3 grouping due to numbers
+
+metadata <- metadata %>% mutate(P_Disarray_0vs1 = ifelse(P_Disarray == 1 | P_Disarray ==2, 1, 0))
+fibro_lv <- m_lv_fb$X
+```
+
+# histology
+```{r}
+# hypertrophy
+metadata_lv <- metadata[metadata$Ventricle == "LV",]
+hyper_cmc <- hypertrophy_cmc$X
+hyper_endo <- hypertrophy_endo$X
+hyper_roi <- c(hyper_cmc, hyper_endo, fibro_lv)
+
+metadata_lv_hyper <- metadata_lv[metadata_lv$X %in% hyper_roi,]
+
+meta_hyper_severe <- metadata_lv_hyper[metadata_lv_hyper$P_Hyp_0vs1 == "1",]
+meta_hyper_norm <- metadata_lv_hyper[metadata_lv_hyper$P_Hyp_0vs1 == "0",]
+roi_hyper_severe <- meta_hyper_severe$X
+roi_hyper_norm <- meta_hyper_norm$X
+count_hyper_severe <- output_e4[,colnames(output_e4) %in% roi_hyper_severe]
+count_hyper_norm <- output_e4[,colnames(output_e4) %in% roi_hyper_norm]
+
+# degeneration
+degen_cmc <- degen_cmc$X
+degen_endo <- degen_endo$X
+degen_roi <- c(degen_cmc, degen_endo, fibro_lv)
+
+metadata_lv_degen <- metadata_lv[metadata_lv$X %in% degen_roi,]
+
+meta_degen_severe <- metadata_lv_degen[metadata_lv_degen$P_Deg_0vs1 == "1",]
+meta_degen_norm <- metadata_lv_degen[metadata_lv_degen$P_Deg_0vs1 == "0",]
+roi_degen_severe <- meta_degen_severe$X
+roi_degen_norm <- meta_degen_norm$X
+count_degen_severe <- output_e4[,colnames(output_e4) %in% roi_degen_severe]
+count_degen_norm <- output_e4[,colnames(output_e4) %in% roi_degen_norm]
+
+# fibrosis
+fibro_cmc <- fibrosis_cmc$X
+fibro_endo <- fibrosis_endo$X
+fibro_roi <- c(fibro_cmc, fibro_endo, fibro_lv)
+
+
+metadata_lv_fibro <- metadata_lv[metadata_lv$X %in% fibro_roi,]
+
+meta_fibro_severe <- metadata_lv_fibro[metadata_lv_fibro$P_Fib_0vs1 == "1",]
+meta_fibro_norm <- metadata_lv_fibro[metadata_lv_fibro$P_Fib_0vs1 == "0",]
+roi_fibro_severe <- meta_fibro_severe$X
+roi_fibro_norm <- meta_fibro_norm$X
+count_fibro_severe <- output_e4[,colnames(output_e4) %in% roi_fibro_severe]
+count_fibro_norm <- output_e4[,colnames(output_e4) %in% roi_fibro_norm]
+
+# disarray
+disarray_cmc <- disarray_cmc$X
+disarray_endo <- disarray_endo$X
+disarray_fb <- m_lv_fb[m_lv_fb$Clinical_phenotype_LV == "NES_HCMP",]
+disarray_fb <- disarray_fb$X
+disarray_roi <- c(disarray_cmc, disarray_endo, disarray_fb)
+
+metadata_lv_disarray <- metadata_lv[metadata_lv$X %in% disarray_roi,]
+
+meta_disarray_severe <- metadata_lv_disarray[metadata_lv_disarray$P_Disarray_0vs1 == "1",]
+meta_disarray_norm <- metadata_lv_disarray[metadata_lv_disarray$P_Disarray_0vs1 == "0",]
+roi_disarray_severe <- meta_disarray_severe$X
+roi_disarray_norm <- meta_disarray_norm$X
+count_disarray_severe <- output_e4[,colnames(output_e4) %in% roi_disarray_severe]
+count_disarray_norm <- output_e4[,colnames(output_e4) %in% roi_disarray_norm]
+```
+
+# visualizing
+```{r}
+library(ktplots)
+
+meta_degen_norm_wonoseg <- read.csv("~/JH/HF/histo_meta/sorted_meta_degen_norm_wonoseg.csv", header = T, row.names = 1)
+count_degen_norm_wonoseg <- read.csv("~/JH/HF/histo_meta/count_degen_norm_wonoseg.csv", row.names = 1)
+meta_hyper_norm_wonoseg <- read.csv("~/JH/HF/histo_meta/sorted_meta_hyper_norm_wonoseg.csv", header = T, row.names = 1)
+count_hyper_norm_wonoseg <- read.csv("~/JH/HF/histo_meta/count_hyper_norm_wonoseg.csv", row.names = 1)
+meta_fibro_norm_wonoseg <- read.csv("~/JH/HF/histo_meta/sorted_meta_fibro_norm_wonoseg.csv", header = T, row.names = 1)
+count_fibro_norm_wonoseg <- read.csv("~/JH/HF/histo_meta/count_fibro_norm_wonoseg.csv", row.names = 1)
+meta_disarray_norm_wonoseg <- read.csv("~/JH/HF/histo_meta/sorted_meta_disarray_norm_wonoseg.csv", header = T, row.names = 1)
+count_disarray_norm_wonoseg <- read.csv("~/JH/HF/histo_meta/count_disarray_norm_wonoseg.csv", row.names = 1)
+
+meta_degen_severe_wonoseg <- read.csv("~/JH/HF/histo_meta/sorted_meta_degen_severe_wonoseg.csv", header = T, row.names = 1)
+count_degen_severe_wonoseg <- read.csv("~/JH/HF/histo_meta/count_degen_severe_wonoseg.csv", row.names = 1)
+meta_hyper_severe_wonoseg <- read.csv("~/JH/HF/histo_meta/sorted_meta_hyper_severe_wonoseg.csv", header = T, row.names = 1)
+count_hyper_severe_wonoseg <- read.csv("~/JH/HF/histo_meta/count_hyper_severe_wonoseg.csv", row.names = 1)
+meta_fibro_severe_wonoseg <- read.csv("~/JH/HF/histo_meta/sorted_meta_fibro_severe_wonoseg.csv", header = T, row.names = 1)
+count_fibro_severe_wonoseg <- read.csv("~/JH/HF/histo_meta/count_fibro_severe_wonoseg.csv", row.names = 1)
+meta_disarray_severe_wonoseg <- read.csv("~/JH/HF/histo_meta/sorted_meta_disarray_severe_wonoseg.csv", header = T, row.names = 1)
+count_disarray_severe_wonoseg <- read.csv("~/JH/HF/histo_meta/count_disarray_severe_wonoseg.csv", row.names = 1)
+
+meta_cli_con_wonoseg <- read.csv("~/JH/HF/histo_meta/sorted_meta_cli_con_wonoseg.csv", header = T, row.names = 1)
+count_cli_con_wonoseg <- read.csv("~/JH/HF/histo_meta/count_cli_con_wonoseg.csv", row.names = 1)
+meta_cli_his_wonoseg <- read.csv("~/JH/HF/histo_meta/sorted_meta_cli_his_wonoseg.csv", header = T, row.names = 1)
+count_cli_his_wonoseg <- read.csv("~/JH/HF/histo_meta/count_cli_his_wonoseg.csv", row.names = 1)
+meta_dis_nes_wonoseg <- read.csv("~/JH/HF/histo_meta/sorted_meta_dis_nes_wonoseg.csv", header = T, row.names = 1)
+count_dis_nes_wonoseg <- read.csv("~/JH/HF/histo_meta/count_dis_nes_wonoseg.csv", row.names = 1)
+meta_dis_es_wonoseg <- read.csv("~/JH/HF/histo_meta/sorted_meta_dis_es_wonoseg.csv", header = T, row.names = 1)
+count_dis_es_wonoseg <- read.csv("~/JH/HF/histo_meta/count_dis_es_wonoseg.csv", row.names = 1)
+
+meta.list <- list(meta_degen_norm_wonoseg, meta_degen_severe_wonoseg, meta_hyper_norm_wonoseg, meta_hyper_severe_wonoseg, meta_fibro_norm_wonoseg, meta_fibro_severe_wonoseg, meta_disarray_norm_wonoseg, meta_disarray_severe_wonoseg, meta_cli_con_wonoseg, meta_cli_his_wonoseg, meta_dis_nes_wonoseg, meta_dis_es_wonoseg)
+
+count.list <- list(count_degen_norm_wonoseg, count_degen_severe_wonoseg, count_hyper_norm_wonoseg, count_hyper_severe_wonoseg, count_fibro_norm_wonoseg, count_fibro_severe_wonoseg, count_disarray_norm_wonoseg, count_disarray_severe_wonoseg, count_cli_con_wonoseg, count_cli_his_wonoseg, count_dis_nes_wonoseg, count_dis_es_wonoseg)
+```
+
+# creating sce
+```{r}
+sce.list <- list()
+
+for (i in 1 : length(meta.list)){
+  sce.list[[i]] <- SingleCellExperiment(
+    assays = list(counts = count.list[[i]]),
+    colData = meta.list[[i]])
+}
+```
+
+```{r}
+means_degen_norm_wonoseg <- read.delim("~/JH/HF/CellphoneDB/newdata/count_degen_norm_wonoseg/statistical_analysis_means_05_29_2024_031203.txt", check.names = F)
+pvals_degen_norm_wonoseg <- read.delim("~/JH/HF/CellphoneDB/newdata/count_degen_norm_wonoseg/statistical_analysis_pvalues_05_29_2024_031203.txt", check.names = F)
+sig_pvals_degen_norm_wonoseg <- read.delim("~/JH/HF/CellphoneDB/newdata/count_degen_norm_wonoseg/statistical_analysis_significant_means_05_29_2024_031203.txt", check.names = F)
+means_degen_severe_wonoseg <- read.delim("~/JH/HF/CellphoneDB/newdata/count_degen_severe_wonoseg/statistical_analysis_means_05_29_2024_031205.txt", check.names = F)
+pvals_degen_severe_wonoseg <- read.delim("~/JH/HF/CellphoneDB/newdata/count_degen_severe_wonoseg/statistical_analysis_pvalues_05_29_2024_031205.txt", check.names = F)
+sig_pvals_degen_severe_wonoseg <- read.delim("~/JH/HF/CellphoneDB/newdata/count_degen_severe_wonoseg/statistical_analysis_significant_means_05_29_2024_031205.txt", check.names = F)
+
+means_hyper_norm_wonoseg <- read.delim("~/JH/HF/CellphoneDB/newdata/count_hyper_norm_wonoseg/statistical_analysis_means_05_29_2024_031208.txt", check.names = F)
+pvals_hyper_norm_wonoseg <- read.delim("~/JH/HF/CellphoneDB/newdata/count_hyper_norm_wonoseg/statistical_analysis_pvalues_05_29_2024_031208.txt", check.names = F)
+sig_pvals_hyper_norm_wonoseg <- read.delim("~/JH/HF/CellphoneDB/newdata/count_hyper_norm_wonoseg/statistical_analysis_significant_means_05_29_2024_031208.txt", check.names = F)
+means_hyper_severe_wonoseg <- read.delim("~/JH/HF/CellphoneDB/newdata/count_hyper_severe_wonoseg/statistical_analysis_means_05_29_2024_031210.txt", check.names = F)
+pvals_hyper_severe_wonoseg <- read.delim("~/JH/HF/CellphoneDB/newdata/count_hyper_severe_wonoseg/statistical_analysis_pvalues_05_29_2024_031210.txt", check.names = F)
+sig_pvals_hyper_severe_wonoseg <- read.delim("~/JH/HF/CellphoneDB/newdata/count_hyper_severe_wonoseg/statistical_analysis_significant_means_05_29_2024_031210.txt", check.names = F)
+
+means_fibro_norm_wonoseg <- read.delim("~/JH/HF/CellphoneDB/newdata/count_fibro_norm_wonoseg/statistical_analysis_means_05_29_2024_031159.txt", check.names = F)
+pvals_fibro_norm_wonoseg <- read.delim("~/JH/HF/CellphoneDB/newdata/count_fibro_norm_wonoseg/statistical_analysis_pvalues_05_29_2024_031159.txt", check.names = F)
+sig_pvals_fibro_norm_wonoseg <- read.delim("~/JH/HF/CellphoneDB/newdata/count_fibro_norm_wonoseg/statistical_analysis_significant_means_05_29_2024_031159.txt", check.names = F)
+means_fibro_severe_wonoseg <- read.delim("~/JH/HF/CellphoneDB/newdata/count_fibro_severe_wonoseg/statistical_analysis_means_05_29_2024_031201.txt", check.names = F)
+pvals_fibro_severe_wonoseg <- read.delim("~/JH/HF/CellphoneDB/newdata/count_fibro_severe_wonoseg/statistical_analysis_pvalues_05_29_2024_031201.txt", check.names = F)
+sig_pvals_fibro_severe_wonoseg <- read.delim("~/JH/HF/CellphoneDB/newdata/count_fibro_severe_wonoseg/statistical_analysis_significant_means_05_29_2024_031201.txt", check.names = F)
+
+means_disarray_norm_wonoseg <- read.delim("~/JH/HF/CellphoneDB/newdata/count_disarray_norm_wonoseg/statistical_analysis_means_05_29_2024_031154.txt", check.names = F)
+pvals_disarray_norm_wonoseg <- read.delim("~/JH/HF/CellphoneDB/newdata/count_disarray_norm_wonoseg/statistical_analysis_pvalues_05_29_2024_031154.txt", check.names = F)
+sig_pvals_disarray_norm_wonoseg <- read.delim("~/JH/HF/CellphoneDB/newdata/count_disarray_norm_wonoseg/statistical_analysis_significant_means_05_29_2024_031154.txt", check.names = F)
+means_disarray_severe_wonoseg <- read.delim("~/JH/HF/CellphoneDB/newdata/count_disarray_severe_wonoseg/statistical_analysis_means_05_29_2024_031156.txt", check.names = F)
+pvals_disarray_severe_wonoseg <- read.delim("~/JH/HF/CellphoneDB/newdata/count_disarray_severe_wonoseg/statistical_analysis_pvalues_05_29_2024_031156.txt", check.names = F)
+sig_pvals_disarray_severe_wonoseg <- read.delim("~/JH/HF/CellphoneDB/newdata/count_disarray_severe_wonoseg/statistical_analysis_significant_means_05_29_2024_031156.txt", check.names = F)
+```
+
+# evaluating significant
+```{r}
+sig.change.gene <- list()
+
+for(i in 1:length(sig.pval.norm.list)){
+  
+  df1 <- sig.pval.norm.list[[i]]
+  df2 <- sig.pval.severe.list[[i]]
+  
+  rownames(df1) <- df1$interacting_pair
+  df1 <- df1[,15:23]
+  df1 <- df1[,c(2:4, 6:8)]
+  df1.row <- rownames(df1)
+  
+  rownames(df2) <- df2$interacting_pair
+  df2 <- df2[,15:23]
+  df2 <- df2[,c(2:4, 6:8)]
+  df2 <- df2[df1.row,]
+  
+  na_positions_df1 <- is.na(df1)
+  na_positions_df2 <- is.na(df2)
+  
+  na_to_value_comparison <- na_positions_df1 & !na_positions_df2
+  
+  rows_with_true <- apply(na_to_value_comparison, 1, any)
+  df3 <- df1[rows_with_true,]
+  df4 <- df2[rows_with_true,]
+  sig.gene <- rownames(df3)
+  
+  sig.change.gene[[i]] <- sig.gene
+  
+}
+```
+
+
+# ktplots for 문
+```{r}
+pval.norm.list <- list(pvals_degen_norm_wonoseg, pvals_hyper_norm_wonoseg, pvals_fibro_norm_wonoseg, pvals_disarray_norm_wonoseg)
+
+pval.severe.list <- list(pvals_degen_severe_wonoseg, pvals_hyper_severe_wonoseg, pvals_fibro_severe_wonoseg, pvals_disarray_severe_wonoseg)
+
+mean.norm.list <- list(means_degen_norm_wonoseg, means_hyper_norm_wonoseg, means_fibro_norm_wonoseg, means_disarray_norm_wonoseg)
+
+mean.severe.list <- list(means_degen_severe_wonoseg, means_hyper_severe_wonoseg, means_fibro_severe_wonoseg, means_disarray_severe_wonoseg)
+
+norm.dotplot.change <- list()
+severe.dotplot.change <- list()
+
+for(i in 1:length(pval.norm.list)) {
+  
+  df5 <- mean.norm.list[[i]]
+  df6 <- pval.norm.list[[i]]
+  
+  sig.gene <- sig.change.gene[[i]]
+  
+  df7 <- mean.severe.list[[i]]
+  df8 <- pval.severe.list[[i]]
+  
+  df5 <- df5[df5$interacting_pair %in% sig.gene,]
+  df6 <- df6[df6$interacting_pair %in% sig.gene,]
+  df7 <- df7[df7$interacting_pair %in% sig.gene,]
+  df8 <- df8[df8$interacting_pair %in% sig.gene,]
+  
+  df5 <- df5[,-c(14,18,22)]
+  df6 <- df6[,-c(14,18,22)]
+  df7 <- df7[,-c(14,18,22)]
+  df8 <- df8[,-c(14,18,22)]
+  
+  sce <- sce.list[[2*i - 1]]
+  sce2 <- sce.list[[2*i]]
+  
+  norm.dotplot.change[[i]] <- plot_cpdb(
+    scdata=sce,
+    cell_type1=".",
+    cell_type2=".",
+    celltype_key="cell_type",
+    means=df5,
+    pvals=df6,
+    genes = ".",
+    keep_significant_only = F,
+    col_option = my_color,
+    max_size = 6,
+    highlight_col = "black",
+    standard_scale = T,
+    highlight_size = 3,
+    cluster_rows = FALSE
+  )
+  
+  severe.dotplot.change[[i]] <- plot_cpdb(
+    scdata=sce2,
+    cell_type1=".",
+    cell_type2=".",
+    celltype_key="cell_type",
+    means=df7,
+    pvals=df8,
+    genes = ".",
+    keep_significant_only = F,
+    col_option = my_color,
+    max_size = 6,
+    highlight_col = "black",
+    standard_scale = T,
+    highlight_size = 3,
+    cluster_rows = FALSE
+  )
+  
+}
+```
+
+# subsetting fibrosis
+```{r}
+# Fibrosis 너무 길어서 나눈다.
+fibro_norm_list <-  list()
+fibro_severe_list <-  list()
+
+df5 <- mean.norm.list[[3]]
+df6 <- pval.norm.list[[3]]
+
+sig.gene <- sig.change.gene[[3]]
+
+df7 <- mean.severe.list[[3]]
+df8 <- pval.severe.list[[3]]
+
+df5 <- df5[df5$interacting_pair %in% sig.gene,]
+df6 <- df6[df6$interacting_pair %in% sig.gene,]
+df7 <- df7[df7$interacting_pair %in% sig.gene,]
+df8 <- df8[df8$interacting_pair %in% sig.gene,]
+
+df5 <- df5[,-c(14,18,22)]
+df6 <- df6[,-c(14,18,22)]
+df7 <- df7[,-c(14,18,22)]
+df8 <- df8[,-c(14,18,22)]
+
+df5_1 <- df5[1:141,]
+df5_2 <- df5[142:282,]
+df5_3 <- df5[283:422,]
+
+df6_1 <- df6[1:141,]
+df6_2 <- df6[142:282,]
+df6_3 <- df6[283:422,]
+
+df7_1 <- df7[1:141,]
+df7_2 <- df7[142:282,]
+df7_3 <- df7[283:422,]
+
+df8_1 <- df8[1:141,]
+df8_2 <- df8[142:282,]
+df8_3 <- df8[283:422,]
+
+sce <- sce.list[[5]]
+sce2 <- sce.list[[6]]
+
+fibro_norm_list[[1]] <- plot_cpdb(
+  scdata=sce,
+  cell_type1=".",
+  cell_type2=".",
+  celltype_key="cell_type",
+  means=df5_1,
+  pvals=df6_1,
+  genes = ".",
+  keep_significant_only = F,
+  col_option = my_color,
+  max_size = 6,
+  highlight_col = "black",
+  standard_scale = T,
+  highlight_size = 3,
+  cluster_rows = FALSE
+)
+
+fibro_severe_list[[1]] <- plot_cpdb(
+  scdata=sce2,
+  cell_type1=".",
+  cell_type2=".",
+  celltype_key="cell_type",
+  means=df7_1,
+  pvals=df8_1,
+  genes = ".",
+  keep_significant_only = F,
+  col_option = my_color,
+  max_size = 6,
+  highlight_col = "black",
+  standard_scale = T,
+  highlight_size = 3,
+  cluster_rows = FALSE)
+```
+
+#Fibrosis_ackr1
+```{r}
+means_fibro_severe_wonoseg_rmsame <- means_fibro_severe_wonoseg[,-c(14,18,22)]
+pvals_fibro_severe_wonoseg_rmsame <- pvals_fibro_severe_wonoseg[,-c(14,18,22)]
+means_fibro_norm_wonoseg_rmsame <- means_fibro_norm_wonoseg[,-c(14,18,22)]
+pvals_fibro_norm_wonoseg_rmsame <- pvals_fibro_norm_wonoseg[,-c(14,18,22)]
+
+plot_cpdb(
+  scdata=sce2,
+  cell_type1=".",
+  cell_type2=".",
+  celltype_key="cell_type",
+  means=means_fibro_severe_wonoseg_rmsame,
+  pvals=pvals_fibro_severe_wonoseg_rmsame,
+  genes = "ACKR1",
+  keep_significant_only = F,
+  col_option = my_color,
+  max_size = 6,
+  highlight_col = "black",
+  standard_scale = T,
+  highlight_size = 3,
+  cluster_rows = FALSE )
+  
+plot_cpdb(
+  scdata=sce,
+  cell_type1=".",
+  cell_type2=".",
+  celltype_key="cell_type",
+  means=means_fibro_norm_wonoseg_rmsame,
+  pvals=pvals_fibro_norm_wonoseg_rmsame,
+  genes = "ACKR1",
+  keep_significant_only = F,
+  col_option = my_color,
+  max_size = 6,
+  highlight_col = "black",
+  standard_scale = T,
+  highlight_size = 3,
+  cluster_rows = FALSE )
+
+```
+

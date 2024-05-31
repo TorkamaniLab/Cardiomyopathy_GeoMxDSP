@@ -1,0 +1,203 @@
+---
+title: "Supple7_CMP"
+output: html_document
+date: "2024-05-29"
+---
+
+```{r}
+require(ggplot2)
+library(ggrepel)
+```
+
+```{r}
+setwd('/gpfs/group/home/salee/Spatial_CMP')
+```
+
+```{r}
+
+DEfile1 = paste0("Final_DE_SejongIn_celltype_FullROI_N_cellselection_N_Cardiomyocytes_ROI_large_Vent_LV_DsSelect_Non_N_OL_pcaplot_outlier_RE_PID_Institute_Fixation.interval_KR_Y2023-06-09", "conditionFB_conditionNo_Seg")
+DEfile2 = paste0("Final_DE_SejongIn_celltype_FullROI_N_cellselection_N_Cardiomyocytes_ROI_large_Vent_LV_DsSelect_Non_N_OL_pcaplot_outlier_RE_PID_Institute_Fixation.interval_KR_Y2023-06-09", "conditionEC_conditionNo_Seg")
+DEfile3 = paste0("Final_DE_SejongIn_celltype_FullROI_N_cellselection_N_Cardiomyocytes_ROI_large_Vent_LV_DsSelect_Non_N_OL_pcaplot_outlier_RE_PID_Institute_Fixation.interval_KR_Y2023-06-09","conditionCMC_conditionNo_Seg")
+DEfile4 = paste0("Final_DE_SejongIn_celltype_FullROI_N_cellselection_N_Cardiomyocytes_ROI_large_Vent_LV_DsSelect_Non_N_OL_pcaplot_outlier_RE_PID_Institute_Fixation.interval_KR_Y2023-06-09","conditionFB_conditionCMC")
+DEfile5 = paste0("Final_DE_SejongIn_celltype_FullROI_N_cellselection_N_Cardiomyocytes_ROI_large_Vent_LV_DsSelect_Non_N_OL_pcaplot_outlier_RE_PID_Institute_Fixation.interval_KR_Y2023-06-09","conditionEC_conditionCMC")
+DEfile6 = paste0("Final_DE_SejongIn_celltype_FullROI_N_cellselection_N_Cardiomyocytes_ROI_large_Vent_LV_DsSelect_Non_N_OL_pcaplot_outlier_RE_PID_Institute_Fixation.interval_KR_Y2023-06-09","conditionFB_conditionEC")
+DEfile7 = paste0("Final_DE_SejongIn_celltype_FullROI_N_cellselection_N_Cardiomyocytes_ROI_large_Vent_LV_DsSelect_Non_N_OL_pcaplot_outlier_RE_PID_Institute_Fixation.interval_KR_Y2023-06-09","conditionFB_(conditionEC+conditionCMC)2")
+DEfile8 = paste0("Final_DE_SejongIn_celltype_FullROI_N_cellselection_N_Cardiomyocytes_ROI_large_Vent_LV_DsSelect_Non_N_OL_pcaplot_outlier_RE_PID_Institute_Fixation.interval_KR_Y2023-06-09","conditionEC_(conditionCMC+conditionFB)2")
+DEfile9 = paste0("Final_DE_SejongIn_celltype_FullROI_N_cellselection_N_Cardiomyocytes_ROI_large_Vent_LV_DsSelect_Non_N_OL_pcaplot_outlier_RE_PID_Institute_Fixation.interval_KR_Y2023-06-09","conditionCMC_(conditionEC+conditionFB)2")
+```
+
+```{r}
+DE1 <- read.csv(file.path(getwd(), "results", paste0(DEfile1, ".csv")), row.names = 1, header = TRUE, stringsAsFactors=FALSE)
+DE2 <- read.csv(file.path(getwd(), "results", paste0(DEfile2, ".csv")), row.names = 1, header = TRUE, stringsAsFactors=FALSE)
+DE3 <- read.csv(file.path(getwd(), "results", paste0(DEfile3, ".csv")), row.names = 1, header = TRUE, stringsAsFactors=FALSE)
+DE4 <- read.csv(file.path(getwd(), "results", paste0(DEfile4, ".csv")), row.names = 1, header = TRUE, stringsAsFactors=FALSE)
+DE5 <- read.csv(file.path(getwd(), "results", paste0(DEfile5, ".csv")), row.names = 1, header = TRUE, stringsAsFactors=FALSE)
+DE6 <- read.csv(file.path(getwd(), "results", paste0(DEfile6, ".csv")), row.names = 1, header = TRUE, stringsAsFactors=FALSE)
+DE7 <- read.csv(file.path(getwd(), "results", paste0(DEfile7, ".csv")), row.names = 1, header = TRUE, stringsAsFactors=FALSE)
+DE8 <- read.csv(file.path(getwd(), "results", paste0(DEfile8, ".csv")), row.names = 1, header = TRUE, stringsAsFactors=FALSE)
+DE9 <- read.csv(file.path(getwd(), "results", paste0(DEfile9, ".csv")), row.names = 1, header = TRUE, stringsAsFactors=FALSE)
+```
+
+```{r}
+DE1$COI <- "FB vs No_Seg"
+DE2$COI <- "EC vs No_Seg"
+DE3$COI <- "CMC vs No_Seg"
+DE4$COI <- "FB vs CMC"
+DE5$COI <- "EC vs CMC"
+DE6$COI <- "FB vs EC"
+DE7$COI <- "FB vs Oth"
+DE8$COI <- "EC vs Oth"
+DE9$COI <- "CMC vs Oth"
+```
+
+```{r}
+DE1$Index <- 1:nrow(DE1)
+DE2$Index <- 1:nrow(DE2)
+DE3$Index <- 1:nrow(DE3)
+DE4$Index <- 1:nrow(DE4)
+DE5$Index <- 1:nrow(DE5)
+DE6$Index <- 1:nrow(DE6)
+DE7$Index <- 1:nrow(DE7)
+DE8$Index <- 1:nrow(DE8)
+DE9$Index <- 1:nrow(DE9)
+```
+
+```{r}
+DE_Noseg<-rbind(DE1, DE2, DE3)
+DE_eachcell<-rbind(DE4, DE5, DE6)
+DE_othercell<-rbind(DE7, DE8, DE9)
+DE_total <- rbind(DE_Noseg, DE_eachcell, DE_othercell)
+```
+
+```{r}
+DE_total$diffexpressed <- "NO"
+DE_total$diffexpressed[DE_total$logFC > 0 & DE_total$adj.P.Val < 0.05] <- "UP"
+DE_total$diffexpressed[DE_total$logFC < 0 & DE_total$adj.P.Val < 0.05] <- "DOWN"
+DE_total$delabel <- NA
+DE_total$delabel[DE_total$diffexpressed != "NO" & DE_total$Index %in% c(1:5)] <- DE_total$SYMBOL[DE_total$diffexpressed != "NO" & DE_total$Index %in% c(1:5)]
+DE_total$COI <- factor(DE_total$COI, levels=c("CMC vs No_Seg", "EC vs No_Seg", "FB vs No_Seg"
+                                              , "EC vs CMC","FB vs CMC", "FB vs EC"
+                                              , "CMC vs Oth", "EC vs Oth", "FB vs Oth")
+                       )
+```
+
+```{r}
+head(DE_total)
+```
+
+```{r}
+DE_total$diffexpressed <- "NO"
+DE_total$diffexpressed[DE_total$logFC > 0 & DE_total$adj.P.Val < 0.05] <- "UP"
+DE_total$diffexpressed[DE_total$logFC < 0 & DE_total$adj.P.Val < 0.05] <- "DOWN"
+DE_total$delabel <- NA
+for (i in c("CMC vs No_Seg", "EC vs No_Seg", "FB vs No_Seg"
+                                              , "EC vs CMC","FB vs CMC", "FB vs EC"
+                                              , "CMC vs Oth", "EC vs Oth", "FB vs Oth")){
+DE_total$delabel[DE_total$diffexpressed == "UP" & DE_total$COI == i][1:3] <- DE_total$SYMBOL[DE_total$diffexpressed == "UP" & DE_total$COI == i][1:3]
+DE_total$delabel[DE_total$diffexpressed == "DOWN" & DE_total$COI == i][1:3] <- DE_total$SYMBOL[DE_total$diffexpressed == "DOWN" & DE_total$COI == i][1:3]
+}
+DE_total$COI <- factor(DE_total$COI, levels=c("CMC vs No_Seg", "EC vs No_Seg", "FB vs No_Seg"
+                                              , "EC vs CMC","FB vs CMC", "FB vs EC"
+                                              , "CMC vs Oth", "EC vs Oth", "FB vs Oth")
+                       )
+```
+
+```{r}
+DE_total$delabel[DE_total$diffexpressed == "UP"][1:3] 
+```
+
+```{r}
+options(repr.plot.width=18, repr.plot.height=5
+       )
+```
+
+## Figure 2K
+
+```{r}
+DE_total$annot <- paste0(DE_total$COI, "_", DE_total$diffexpressed)
+DE_total$annot <- factor(DE_total$annot,
+                         levels = c("FB vs No_Seg_UP", "FB vs No_Seg_DOWN", "FB vs No_Seg_NO", "EC vs No_Seg_UP", "EC vs No_Seg_DOWN", "EC vs No_Seg_NO", "CMC vs No_Seg_DOWN", "CMC vs No_Seg_UP", "CMC vs No_Seg_NO", "FB vs CMC_UP", "FB vs CMC_DOWN", "FB vs CMC_NO", "EC vs CMC_UP", "EC vs CMC_DOWN", "EC vs CMC_NO", "FB vs EC_DOWN", "FB vs EC_NO", "FB vs EC_UP", "FB vs Oth_UP", "FB vs Oth_NO", "FB vs Oth_DOWN", "EC vs Oth_UP", "EC vs Oth_NO", "EC vs Oth_DOWN", "CMC vs Oth_UP", "CMC vs Oth_NO", "CMC vs Oth_DOWN"), 
+                         labels = c("FB", "No_Seg", "NO", "EC", "No_Seg", "NO", "No_Seg", "CMC", "NO", "FB", "CMC", "NO", "EC", "CMC", "NO", "EC", "NO", "FB", "FB", "NO", "other", "EC", "NO", "other", "CMC", "NO", "other"))
+
+```
+
+```{r}
+ggplot(data=DE_total, aes(x=COI, y=(-log10(adj.P.Val))*(sign(logFC)), col=annot, label=delabel)) +
+geom_jitter(width=0.02) +
+theme_minimal() +
+geom_text_repel(size=4, max.overlap=3, point.padding=0.2, min.segment.length=0.2, color="black", family="Arial") +
+scale_color_manual(values=c("CMC" = "#FD8A8A", "FB" = "#E9C874", "No_Seg" = "#A8D1D1", "EC" = "#9EA1D4", "NO" = "black", "other" = "grey")) +
+geom_hline(yintercept=c(-log10(0.05), log10(0.05)), col="red") +
+geom_hline(yintercept=0, col="black") + 
+theme(axis.text.x=element_text(size=14,face="bold"),
+        axis.title=element_text(size=14,face="bold"),
+     legend.title=element_blank(),
+     legend.text = element_text(size=12),
+     ) +
+xlab("") +
+guides(color = guide_legend(override.aes = list(size = 8))) 
+```
+
+# Supple 7b
+```{r}
+cmc_other <- read.csv("~/JH/HF/Marker/supple_cmc_marker.csv")
+endo_other <- read.csv("~/JH/HF/Marker/supple_endo_marker.csv")
+fibro_other <- read.csv("~/JH/HF/Marker/supple_fibro_marker.csv")
+colnames(cmc_other) <- cmc_other[1,]
+cmc_other <- cmc_other[-1,]
+cmc_other$logFC <- as.numeric(cmc_other$logFC)
+cmc_other$adj.P.Val <- as.numeric(cmc_other$adj.P.Val)
+colnames(endo_other) <- endo_other[1,]
+endo_other <- endo_other[-1,]
+endo_other$logFC <- as.numeric(endo_other$logFC)
+endo_other$adj.P.Val <- as.numeric(endo_other$adj.P.Val)
+colnames(fibro_other) <- fibro_other[1,]
+fibro_other <- fibro_other[-1,]
+fibro_other$logFC <- as.numeric(fibro_other$logFC)
+fibro_other$adj.P.Val <- as.numeric(fibro_other$adj.P.Val)
+
+cmc.sort <- cmc_other[order(cmc_other$logFC, decreasing = T),]
+cmc.up <- cmc.sort[1:100,]
+cmc.up <- cmc.up$Column1
+
+cmc.down <- cmc.sort[(nrow(cmc.sort)-99):nrow(cmc.sort),]
+cmc.down <- cmc.down$Column1
+
+endo.sort <- endo_other[order(endo_other$logFC, decreasing = T),]
+endo.up <- endo.sort[1:100,]
+endo.up <- endo.up$Column1
+
+endo.down <- endo.sort[(nrow(endo.sort)-99):nrow(endo.sort),]
+endo.down <- endo.down$Column1
+
+fb.sort <- fibro_other[order(fibro_other$logFC, decreasing = T),]
+fb.up <- fb.sort[1:100,]
+fb.up <- fb.up$Column1
+
+fb.down <- fb.sort[(nrow(fb.sort)-99):nrow(fb.sort),]
+fb.down <- fb.down$Column1
+
+```
+
+```{r}
+library(pheatmap)
+top100_marker <- c(cmc.up, cmc.down, endo.down, endo.up, fb.down, fb.up)
+top100_marker <- unique(top100_marker)
+
+heatmap_count <- logcounts[rownames(logcounts) %in% top100_marker,]
+
+Celltype = data.frame(
+  Group = factor(c(rep("Trp", 83), rep("vessel", 45), rep("fb", 13), rep("Full.ROI", 16))))
+
+
+rownames(Celltype) = finalROI_order
+
+ann_colors = list(Group = c(Trp = "#FD8A8A", vessel = "#9EA1D4", fb = "#E9C874", Full.ROI = "#A8D1D1"))
+
+my_palette <- colorRampPalette(c('blue', 'white', 'red'))(100)
+
+p1 <- pheatmap(heatmap_count, show_rownames = F, show_colnames = F, scale='row', cluster_rows = T, cluster_cols = T,
+               annotation_col = Celltype, annotation_colors = ann_colors,
+               treeheight_row = 20, treeheight_col = 20, family = 'Arial', color = my_palette, clustering_method = "ward.D")
+```
+

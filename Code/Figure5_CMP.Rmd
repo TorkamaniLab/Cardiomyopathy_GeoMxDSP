@@ -1,0 +1,143 @@
+---
+title: "Figure5_CMP"
+output: html_document
+date: "2024-05-28"
+---
+
+```{r}
+fileforloading = 'Spatialanalysis_SejongIn_ClinicalNHist_Control2_FullROI_N_cellselection_Y_Cardiomyocytes_ROI_large_Vent_LV_DsSelect_Non_N_OL_pcaplot_outlier_RE_PID_Institute_Fixation.interval_KR_Y2023-06-24_analysis'
+
+load(paste0(fileforloading, ".RData"))
+
+```
+
+# Figure 5d
+```{r}
+deg.list <- list()
+deg.list[[1]] <- `conditionControl_His-conditionControl_Clin_all`
+deg.list[[2]] <- `conditionDiseased_ES-conditionControl_Clin_all`
+deg.list[[3]] <- `conditionDiseased_NES-conditionControl_Clin_all`
+deg.list[[4]] <- `conditionDiseased_ES-conditionControl_His_all`
+deg.list[[5]] <- `conditionDiseased_NES-conditionControl_His_all`
+deg.list[[6]] <- `conditionDiseased_ES-conditionDiseased_NES_all`
+
+up.color <- list()
+up.color[[1]] <- "#D95F02"
+up.color[[2]] <- "#E7298A"
+up.color[[3]] <- "#7570B3"
+up.color[[4]] <- "#E7298A"
+up.color[[5]] <- "#7570B3"
+up.color[[6]] <- "#E7298A"
+down.color <- list()
+down.color[[1]] <- "#1B9E77"
+down.color[[2]] <- "#1B9E77"
+down.color[[3]] <- "#1B9E77"
+down.color[[4]] <- "#D95F02"
+down.color[[5]] <- "#D95F02"
+down.color[[6]] <- "#7570B3"
+
+clinic_histo_volcano_label <- list()
+clinic_histo_volcano_nolabel <- list()
+
+for(i in 1:length(deg.list)){
+  de <- deg.list[[i]]
+  de$logFC <- as.numeric(de$logFC)
+  de$adj.P.Val <- as.numeric(de$adj.P.Val)
+  de$diffexpressed <- "NO"    # UP DOWN GENE을 유의미한 범위서 구분하기 위한 방법 
+  de$diffexpressed[de$logFC >  0.5 & de$adj.P.Val < 0.05] <- "UP"           
+  de$diffexpressed[de$logFC < -0.5 & de$adj.P.Val < 0.05] <- "DOWN" #기분 나빠 보이는 gene은 다 날려버리기
+  de$delabel <- NA
+  de$delabel[de$diffexpressed != "NO"] <- de$SYMBOL[de$diffexpressed != "NO"]     # 유의미한 gene만 labeling 하기 
+  
+  de$adj.P.Val[de$adj.P.Val < 5e-320 ] <- 5e-320     # p_val이 0인 애들이 border에서 구리구리하게 나오는걸 방지하기 위해 임의의 값을 부여 (나중에 0임을 알려줘야 하긴 함)
+  
+  clinic_histo_volcano_label[[i]] <- ggplot(data=de, aes(x=logFC, y=-log10(adj.P.Val), col=diffexpressed, label=delabel)) +
+    geom_point() + 
+    theme_classic()+
+    geom_text_repel(size=5, show.legend = F,min.segment.length = 1, nudge_x = c(0.1, -0.1) ,
+                    nudge_y = c(5), color= "black", fontface = "italic", fontfamily="arial")+
+    scale_color_manual(values=c(down.color[[i]], "grey", up.color[[i]])) +
+    geom_vline(xintercept=c(-0.25, 0.25), col="grey", linetype='dashed') +
+    geom_hline(yintercept=-log10(0.05), col="grey", linetype='dashed') +
+    xlim(-max(abs(de$logFC)), max(abs(de$logFC))) + NoLegend()
+  
+  clinic_histo_volcano_nolabel[[i]] <- ggplot(data=de, aes(x=logFC, y=-log10(adj.P.Val), col=diffexpressed)) +
+    geom_point() + 
+    theme_classic()+
+    scale_color_manual(values=c(down.color[[i]], "grey", up.color[[i]])) +
+    geom_vline(xintercept=c(-0.25, 0.25), col="grey", linetype='dashed') +
+    geom_hline(yintercept=-log10(0.05), col="grey", linetype='dashed') +
+    xlim(-max(abs(de$logFC)), max(abs(de$logFC))) + NoLegend()
+}
+
+```
+
+```{r}
+dis_es <- read.csv("~/JH/HF/RData/results/fgsea_SejongIn_ES_0vs1_FullROI_N_cellselection_Y_Cardiomyocytes_ROI_large_Vent_LV_DsSelect_Non_N_OL_pcaplot_outlier_RE_PID_Institute_Fixation.interval_KR_Y2024-05-13NA.csv")
+dis_nes <- read.csv("~/JH/HF/RData/results/fgsea_SejongIn_NES_0vs1_FullROI_N_cellselection_Y_Cardiomyocytes_ROI_large_Vent_LV_DsSelect_Non_N_OL_pcaplot_outlier_RE_PID_Institute_Fixation.interval_KR_Y2024-05-13NA.csv")
+cli_his <- read.csv("~/JH/HF/RData/results/fgsea_SejongIn_Clinical_Histo_FullROI_N_cellselection_Y_Cardiomyocytes_ROI_large_Vent_LV_DsSelect_Non_N_OL_pcaplot_outlier_RE_PID_Institute_Fixation.interval_KR_Y2024-05-13NA.csv")
+cli_con <- read.csv("~/JH/HF/RData/results/fgsea_SejongIn_Clinical_Control_FullROI_N_cellselection_Y_Cardiomyocytes_ROI_large_Vent_LV_DsSelect_Non_N_OL_pcaplot_outlier_RE_PID_Institute_Fixation.interval_KR_Y2024-05-13NA.csv")
+
+fgsea_merge <- merge(x = cli_con, y = cli_his, by = "pathway")
+fgsea_merge <- merge(x= fgsea_merge, y=dis_nes, by = "pathway")
+fgsea_merge <- merge(x= fgsea_merge, y=dis_es, by = "pathway")
+fgsea_merge <- fgsea_merge[,c(1, 3:6, 11:14, 19:22, 27:30)]
+
+colnames(fgsea_merge) <- c("pathway", "cli_con_pval", "cli_con_padj", "cli_con_ES", "cli_con_NES", "cli_his_pval", "cli_his_padj", "cli_his_ES", "cli_his_NES", "dis_nes_pval", "dis_nes_padj", "dis_nes_ES", "dis_nes_NES", "dis_es_pval", "dis_es_padj", "dis_es_ES", "dis_es_NES")
+
+fgsea_merge <- fgsea_merge[, c(1,3,5,7,9,11,13,15,17)]
+fgsea_merge_sort <- fgsea_merge %>% 
+  mutate(cli_con_NES = ifelse(cli_con_padj < 0.05, cli_con_NES, 0),
+         cli_his_NES = ifelse(cli_his_padj < 0.05, cli_his_NES, 0),
+         dis_nes_NES = ifelse(dis_nes_padj < 0.05, cli_his_NES, 0),
+         dis_es_NES = ifelse(dis_es_padj < 0.05, cli_his_NES, 0))
+
+fgsea_merge_sort_filter <- fgsea_merge_sort %>% filter(cli_con_padj < 0.05 | cli_his_padj < 0.05 | dis_nes_padj < 0.05 | dis_es_padj < 0.05)
+
+sorted_fgsea <- fgsea_merge_sort_filter$pathway
+
+fgsea_merge_sort <- fgsea_merge_sort[, c(1,3,5,7,9)]
+rownames(fgsea_merge_sort) <- fgsea_merge_sort$pathway
+fgsea_merge_sort <- fgsea_merge_sort[,c(2:5)]
+
+cli_con_sort <- cli_con[, c(2, 4, 6)]
+cli_his_sort <- cli_his[,c(2,4,6)]
+dis_nes_sort <- dis_nes[,c(2,4,6)]
+dis_es_sort <- dis_es[,c(2,4,6)]
+
+cli_con_sort$stage <- "Clinic_con"
+cli_his_sort$stage <- "Clinic_his"
+dis_nes_sort$stage <- "Disease_nes"
+dis_es_sort$stage <- "Disease_es"
+
+merge_sort <- rbind(cli_con_sort, cli_his_sort, dis_nes_sort, dis_es_sort)
+merge_sort <- merge_sort[merge_sort$pathway %in% sorted_fgsea,]
+
+merge_sort <- merge_sort %>% mutate(clas=ifelse(padj<0.05 & NES>0, "Positive", ifelse(padj<0.05 & NES<0, "Negative", "Insignificant")))
+merge_sort <- merge_sort %>% mutate(pvalue=ifelse(padj > 0.05, "white", "black"))
+
+
+merge_sort$stage <- factor(merge_sort$stage,
+                           levels = c("Clinic_con", "Clinic_his", "Disease_nes", "Disease_es"))
+
+merge_sort$pathway <- factor(merge_sort$pathway,
+                             levels = c("HALLMARK_EPITHELIAL_MESENCHYMAL_TRANSITION", "HALLMARK_INFLAMMATORY_RESPONSE", "HALLMARK_INTERFERON_ALPHA_RESPONSE", "HALLMARK_INTERFERON_GAMMA_RESPONSE", "HALLMARK_MYOGENESIS", "HALLMARK_COMPLEMENT", "HALLMARK_COAGULATION", "HALLMARK_TNFA_SIGNALING_VIA_NFKB", "HALLMARK_HEDGEHOG_SIGNALING", "HALLMARK_IL6_JAK_STAT3_SIGNALING", "HALLMARK_HEME_METABOLISM", "HALLMARK_ESTROGEN_RESPONSE_EARLY", "HALLMARK_MYC_TARGETS_V1", "HALLMARK_OXIDATIVE_PHOSPHORYLATION", "HALLMARK_ADIPOGENESIS", "HALLMARK_FATTY_ACID_METABOLISM", "HALLMARK_MITOTIC_SPINDLE", "HALLMARK_ESTROGEN_RESPONSE_LATE", "HALLMARK_ALLOGRAFT_REJECTION", "HALLMARK_UV_RESPONSE_UP", "HALLMARK_UV_RESPONSE_DN"))
+
+ggplot(merge_sort, aes(x = stage, y = pathway, fill = NES, color = pvalue)) +
+  geom_point(aes(size = -log10(padj)), alpha = 1, shape = 21, stroke = 1) +
+  scale_size_continuous(range = c(0.05,7)) +
+  theme_bw() +
+  #theme(axis.line = element_line(colour = "black", size = 0.8)) +
+  theme(panel.grid = element_blank()) +
+  #ylab("Proportion of Cells") +
+  xlab("") +
+  #theme(text = element_text(size=11)) +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1)) +
+  scale_y_discrete(limits = rev(levels(merge_sort$pathway))) +
+  #scale_y_continuous(expand = expansion(mult = c(0, 0))) +
+  #guides(fill = guide_legend(ncol = 1)) +
+  #theme(legend.key.height = unit(10, units = 'pt')) +
+  scale_fill_gradientn(colors = brewer.pal(n = 11, name = "RdBu")[11:1], limits = c(min(merge_sort$NES), max(merge_sort$NES))) + 
+  scale_color_manual(values = c("black", "white"))  
+```
+

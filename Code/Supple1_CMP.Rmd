@@ -1,0 +1,137 @@
+---
+title: "Supple1_CMP"
+output: html_document
+date: "2024-05-29"
+---
+
+```{r}
+library(RColorBrewer)
+library(viridisLite)
+library(viridis)
+library(Seurat)
+library(ggplot2)
+library(dplyr)
+library(patchwork)
+require(data.table)
+library(dittoSeq)
+library(tidyr)
+library(SeuratWrappers, lib.loc = "/home/jsy/R/x86_64-pc-linux-gnu-library/4.1")
+library(PCFAM)
+library(factoextra)
+library(ggrepel)
+library(tidyverse)
+library(ggfortify)
+```
+
+# Supple 1b
+```{r}
+nature_cvr <- load("~/HF/HF_cvr/GSE183852_DCM_Integrated.Robj")
+
+Idents(nature_cvr) <- "tech"
+HF_cvr_sn <- subset(nature_cvr, idents = "SN")
+
+Idents(HF_cvr_sn) <- "Names"
+
+HF_cvr_sn2 <- subset(HF_cvr_sn, idents = c("Cardiomyocytes", "Endothelium", "Fibroblasts", "Pericytes", "Smooth_Muscle", "Myeloid", "NK/T-Cells", "B-Cells", "Neurons", "Lymphatic", "Mast", "Adipocytes"))
+
+DimPlot(HF_cvr_sn2, label = F, group.by = "Names", cols = c("#FD8A8A", "#9EA1D4", "#E9C874", "#007F73", "#5ec3cb", "#4CCD99", "#240A34", "#490685", "#29506c", "#f02dc7", "#FDAF7B", "#FFEDD8"), raster = F) + ggtitle(NULL)
+
+
+```
+
+# Supple 1c
+```{r}
+my_palette <- colorRampPalette(c("#FFF5E2", "#C70039", '#900C3F'))(8)
+
+FeaturePlot(HF_cvr_sn2, features = "VIM", raster = F, cols= c("grey90", my_palette))
+FeaturePlot(HF_cvr_sn2, features = "PECAM1", raster = F, cols= c("grey90", my_palette))
+FeaturePlot(HF_cvr_sn2, features = "TNNI3", raster = F, cols= c("grey90", my_palette))
+```
+
+# Supple 1d
+# Emulate our data
+```{r}
+Idents(HF_cvr_sn2) <- "tech"
+cmc <- subset(HF_cvr_sn2, subset = TNNI3 >= 0.5)
+cmc <- subset(cmc, subset = VIM < 0.5)
+cmc <- subset(cmc, subset = PECAM1 < 0.5)
+endo <- subset(HF_cvr_sn2, subset = PECAM1 >= 0.5)
+endo <- subset(endo, subset = VIM >= 0.5)
+endo <- subset(endo, subset = TNNI3 < 0.5)
+fibro <- subset(HF_cvr_sn2, subset = VIM >= 0.5)
+fibro <- subset(fibro, subset = PECAM1 < 0.5)
+fibro <- subset(fibro, subset = TNNI3 < 0.5)
+
+```
+
+# Contrast
+```{r}
+cmc <- subset(HF_cvr_sn2, subset = TNNI3 >= 0.5)
+cmc <- subset(cmc, subset = VIM < 0.5)
+cmc <- subset(cmc, subset = PECAM1 < 0.5)
+endo <- subset(HF_cvr_sn2, subset = PECAM1 >= 0.5)
+endo <- subset(endo, subset = TNNI3 < 0.5)
+fibro <- subset(HF_cvr_sn2, subset = VIM >= 0.5)
+fibro <- subset(fibro, subset = PECAM1 < 0.5)
+fibro <- subset(fibro, subset = TNNI3 < 0.5)
+```
+
+```{r}
+cmc$cmc.anno <- cmc$tech
+cmc$cmc.anno <- factor(cmc$cmc.anno, 
+                       levels = c("SN"),
+                       labels = c("Cardiomyocyte_spatial"))
+endo$endo.anno <- endo$tech
+endo$endo.anno <- factor(endo$endo.anno,
+                         levels = c("SN"),
+                         labels = c("Endothelium_spatial"))
+fibro$fib.anno <- fibro$tech
+fibro$fib.anno <- factor(fibro$fib.anno,
+                         levels = c("SN"),
+                         labels = c("Fibroblast_spatial"))
+
+HF_cvr_sn2$hf.anno <- HF_cvr_sn2$Names
+HF_cvr_sn2$hf.anno <- as.character(HF_cvr_sn2$hf.anno)
+
+HF_cvr_sn2@meta.data[rownames(filter(cmc@meta.data, cmc.anno == "Cardiomyocyte_spatial")), "hf.anno"] <- "Cardiomyocyte_spatial"
+HF_cvr_sn2@meta.data[rownames(filter(endo@meta.data, endo.anno == "Endothelium_spatial")), "hf.anno"] <- "Endothelium_spatial"
+HF_cvr_sn2@meta.data[rownames(filter(fibro@meta.data, fib.anno == "Fibroblast_spatial")), "hf.anno"] <- "Fibroblast_spatial"
+
+Idents(HF_cvr_sn2) <- "hf.anno"
+CMP_geom <- subset(HF_cvr_sn2, idents = c("Cardiomyocyte_spatial", "Endothelium_spatial", "Fibroblast_spatial"))
+
+DimPlot(CMP_geom, label = F, raster = F, cols = c("#FD8A8A", "#9EA1D4", "#E9C874"))
+
+pbmc3k.bulk <- AverageExpression(CMP_geom, return.seurat = TRUE, group.by = c('hf.anno'), add.ident = "orig.ident")
+
+pbmc3k.bulk <- NormalizeData(pbmc3k.bulk) %>% 
+  FindVariableFeatures() %>% 
+  ScaleData() %>% 
+  RunPCA(npcs = 2)
+
+pbmc3k.bulk$cells <- rownames(pbmc3k.bulk@meta.data)
+
+pbmc3k.bulk$cells <- factor(pbmc3k.bulk$cells, levels =  unique(pbmc3k.bulk$cells) %>% str_sort())
+
+pcaRes <-  prcomp(t(x = pbmc3k.bulk@assays$SCT@scale.data), center = F, scale. = F) 
+
+autoplot(pcaRes)
+
+dat <- t(x = pbmc3k.bulk@assays$SCT@scale.data)
+pcaRes <- prcomp(dat, center = TRUE, scale. = TRUE)
+dat <- as.data.frame(dat)
+
+dat$PC1 <- pcaRes$x[, 1]
+dat$PC2 <- pcaRes$x[, 2]
+class <- gsub("_.*", "", rownames(dat))
+dat$region <-class
+
+region_color <- c("#FD8A8A", "#9EA1D4", "#E9C874")
+
+p1 <- ggplot(data = dat, aes(x = PC1, y = PC2)) +
+  geom_point(aes(colour = region)) +
+  scale_colour_manual(values = c("#FD8A8A", "#9EA1D4", "#E9C874")) +
+  theme_bw() + 
+  theme_classic()
+```
+
